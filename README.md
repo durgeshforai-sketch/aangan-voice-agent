@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aangan Studio — Voice AI enquiry desk
 
-## Getting Started
+Every call to Aangan gets answered within a couple of rings, day or night. The agent qualifies the caller against Nikhil's rubric and books qualified leads straight into a designer's calendar. The designer gets a brief on Telegram that answers everything they'd otherwise ask on the first call. Nikhil gets one dashboard covering volume, outcomes, pipeline value and what the system costs.
 
-First, run the development server:
+**MESA Case 03.** Stack (fixed): Vaani Labs · Gemini Flash · Cal.com · Telegram · HubSpot · Neon · Vercel · GitHub · Claude.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## How a call flows
+```
+Caller ─▶ Vaani (Aanya, docs/vaani-agent-prompt.md)
+           │  live tools (optional): lookup-caller · check-availability · book-consultation · escalate
+           ▼
+        call.completed webhook ─▶ /api/vaani/webhook ─▶ Neon (calls)
+           ▼ (after response)
+        Gemini Flash: transcript → structured facts         src/lib/extract.ts
+        Rules: Nikhil's 5 criteria → verdict + route         src/lib/qualify.ts   (deterministic, tested)
+           ▼
+   book / book_with_note → Cal.com booking (live or post-call) → Telegram brief to designer → deal (→ HubSpot)
+   review / mismatch / booking_failed → front-desk queue + Telegram alert
+   escalate → callback deadline + alert          nurture → follow-up date          close / log → stored with reasons
+           ▼
+   Designer taps in Telegram (confirm · reassign · outcome · 👍/👎) → bookings, deals, HubSpot stay current
+   Sweeper every 10 min (GitHub Actions): retries, overdue alerts, nurture due, HubSpot sync
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**The Cut:** the agent never quotes a price (`knowledge/pricing.md`). Price bands are used only internally, to estimate pipeline value.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Key files
+| | |
+|---|---|
+| `docs/agent-spec.md` | What the agent does and why, including rule decisions where the seed files disagree |
+| `docs/vaani-agent-prompt.md` | The prompt to paste into Vaani |
+| `docs/setup.md` | Keys, deploy, Vaani/Cal.com/Telegram/HubSpot setup, rollout |
+| `eval/` | The 40 September enquiries as labelled tests, transcripts, persona cards, eval runners |
+| `src/lib/` | Rules, extraction, pipeline, integrations |
+| `src/app/(dash)` | Dashboard: overview, calls, front-desk queue |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Commands
+```bash
+npm test                    # rules vs 40 labelled enquiries
+npm run eval:extraction     # Gemini extraction on the real transcripts
+npm run eval:conversations  # offline rehearsal of the agent prompt vs simulated callers
+npm run simulate            # full pipeline on the Neon test branch
+npm run dev                 # dashboard at localhost:3000
+```

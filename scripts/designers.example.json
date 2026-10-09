@@ -1,0 +1,4 @@
+[
+  { "name": "Designer One", "telegramChatId": "", "calcomUserId": "", "specialties": ["residential"] },
+  { "name": "Designer Two", "telegramChatId": "", "calcomUserId": "", "specialties": ["residential", "commercial"] }
+]

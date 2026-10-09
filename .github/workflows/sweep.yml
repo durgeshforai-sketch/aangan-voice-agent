@@ -1,0 +1,15 @@
+# Vercel's free plan only allows daily crons; this runs the sweeper every 10 minutes.
+# Needs repo secrets: APP_BASE_URL (the Vercel URL) and CRON_SECRET (same value as in Vercel env).
+name: sweep
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run sweeper
+        run: |
+          curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_BASE_URL }}/api/cron/sweep"
