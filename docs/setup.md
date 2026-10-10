@@ -67,7 +67,7 @@ The tab names below are the agent-editor tabs in the Vaani console. Option label
 - Speech-to-text: a multilingual / Indian-languages model. If there's a keyword boost, add Pune localities (Kothrud, Baner, Aundh, Wakad, Hinjewadi, Pimple Saudagar…), plus BHK, carpet area, modular kitchen, possession.
 - LLM: a fast model; temperature low (~0.3); short responses.
 - **System tools:** `transfer_call` only once the front desk has a number to transfer to; everything else OFF. **Integration tools: all OFF.** Vaani's own booking tools would book outside our system, and Telegram and HubSpot would never hear about it.
-- **Custom tools:** add the four below (POST, header `Authorization: Bearer <VAANI_TOOL_SECRET>`).
+- **Custom tools:** optional; see the note below the table (POST, header `Authorization: Bearer <VAANI_TOOL_SECRET>`).
 - **Memories → Use previous call contexts: ON** (repeat callers like T16 aren't re-asked everything).
 
 | Tool | URL (`https://aangan-voice-agent-rust.vercel.app` + …) | Parameters |
@@ -77,7 +77,9 @@ The tab names below are the agent-editor tabs in the Vaani console. Option label
 | `book_consultation` | `/api/vaani/tools/book-consultation` | `start` (exact value from check_availability), `mode`, `name`, `phone`, `address`, `segment` |
 | `escalate` | `/api/vaani/tools/escalate` | `reason`, `name`, `phone` |
 
-Every response includes `say`, a line the agent can use as-is. If the tools don't fire on voice calls (they were reported failing in Vaani's chat tests), remove them: the system then books right after the call, and the designer confirms the time.
+Every response includes `say`, a line the agent can use as-is. The four tools are also available as one combined tool, `/api/vaani/tools/desk`, with `action` = `check_availability` | `book_consultation` | `escalate`.
+
+**What actually happened (10 Oct 2026):** Vaani's console creates custom tools but never attaches them to the agent (the "Failed to save custom tool" error is really "already exists" on the retry). So the live agent runs **without tools**. Aanya collects the mode and two preferred times, and **the system books the best-matching Cal.com slot seconds after the call**, with a compact brief and a dashboard link in the booking notes (Cal.com caps notes at about 480 characters). The consultant confirms the time with the client. If Vaani fixes tool attachment, add `aangan_desk` and switch the prompt back to booking on the call.
 
 **Training → Knowledge:** attach `knowledge/services.md` and `knowledge/qualified.md` only. **Never upload `pricing.md`.** An agent that can read the rates can say them, and keeping them out is what guarantees the Cut.
 
