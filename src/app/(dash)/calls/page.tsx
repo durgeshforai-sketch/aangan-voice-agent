@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -6,6 +7,7 @@ import { formatIst } from "@/lib/hours";
 import type { ExtractedLead } from "@/lib/lead";
 
 export default async function Calls({ searchParams }: { searchParams: Promise<{ origin?: string; phone?: string }> }) {
+  await connection(); // per-request: these pages read the clock and the database
   const sp = await searchParams;
   const origin = sp.origin === "simulation" ? "simulation" : "live";
   const phone = sp.phone?.trim() || null;

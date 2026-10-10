@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { overview, RANGES, type Range } from "@/lib/metrics";
 import { Filters, Kpi, inr, pct } from "@/components/ui";
@@ -13,9 +14,11 @@ const STAGE_LABEL: Record<string, string> = {
 };
 
 export default async function Overview({ searchParams }: { searchParams: Promise<{ range?: string; origin?: string }> }) {
+  await connection(); // per-request: these pages read the clock and the database
   const sp = await searchParams;
-  const range = (RANGES.some((r) => r.key === sp.range) ? sp.range : "30d") as Range;
   const origin = sp.origin === "simulation" ? "simulation" : "live";
+  // The seed enquiries are from September, so test calls open on 90 days
+  const range = (RANGES.some((r) => r.key === sp.range) ? sp.range : origin === "simulation" ? "90d" : "30d") as Range;
   const m = await overview(range, origin);
 
   const leads = m.verdict.green + m.verdict.amber + m.verdict.red;
@@ -26,7 +29,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     <>
       <div className="filters" style={{ justifyContent: "space-between" }}>
         <Filters base={origin === "simulation" ? "/?origin=simulation" : "/"} current={range} items={RANGES} />
-        <Link className="chip" href={origin === "live" ? `/?origin=simulation&range=${range}` : `/?range=${range}`}>
+        <Link className="chip" href={origin === "live" ? "/?origin=simulation" : `/?range=${range}`}>
           {origin === "live" ? "Show test calls" : "← Back to live calls"}
         </Link>
       </div>

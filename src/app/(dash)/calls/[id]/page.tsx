@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { desc, eq } from "drizzle-orm";
@@ -38,6 +39,7 @@ async function act(formData: FormData) {
 }
 
 export default async function CallDetail({ params }: { params: Promise<{ id: string }> }) {
+  await connection(); // per-request: these pages read the clock and the database
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const db = getDb();
