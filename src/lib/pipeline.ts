@@ -160,7 +160,7 @@ async function linkCaller(callId: string, phone: string | null, name: string | n
   const [caller] = await db
     .insert(schema.callers)
     .values({ phone, name, lastSummary: summary })
-    .onConflictDoUpdate({ target: schema.callers.phone, set: { ...(name ? { name } : {}), ...(summary ? { lastSummary: summary } : {}) } })
+    .onConflictDoUpdate({ target: schema.callers.phone, set: { phone, ...(name ? { name } : {}), ...(summary ? { lastSummary: summary } : {}) } })
     .returning();
   await db.update(schema.calls).set({ callerId: caller.id }).where(eq(schema.calls.id, callId));
   return caller;
