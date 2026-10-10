@@ -11,17 +11,12 @@ import { bookSlot, bookingConfigured, offerSlots } from "./booking";
 import { leastLoaded } from "./designers";
 import { handoffMessage, confirmButtons } from "./handoff";
 import { sendMessage } from "./telegram";
+import { normalisePhone } from "./phone";
+
+export { normalisePhone };
 
 // After every call: store → extract (Gemini) → decide (rules) → act (book / hand off / escalate / log).
 
-export function normalisePhone(p: string | null | undefined): string | null {
-  if (!p) return null;
-  const digits = p.replace(/\D/g, "");
-  if (/x|\*/i.test(p) || digits.length < 10) return null; // masked or partial
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
-  return `+${digits}`;
-}
 
 const appUrl = (path: string) => `${process.env.APP_BASE_URL ?? "http://localhost:3000"}${path}`;
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);

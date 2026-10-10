@@ -13,7 +13,7 @@ export const Extraction = z.object({
   callerPhoneSpoken: z
     .string()
     .nullable()
-    .describe("Phone number the caller confirmed on the call, E.164 if possible (+91…)"),
+    .describe("Phone number the caller confirmed on the call, as E.164. Callers are in India: a 10-digit number is +91 followed by those digits, never +1."),
   agentBooked: z.boolean().describe("The agent confirmed a consultation booking on this call"),
   agentQuotedPrice: z
     .boolean()
