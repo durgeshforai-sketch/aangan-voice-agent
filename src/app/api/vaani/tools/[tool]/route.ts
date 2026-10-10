@@ -41,7 +41,9 @@ async function handle(req: Request, ctx: { params: Promise<{ tool: string }> }) 
   // Tool calls that never arrive were the main failure seen in Vaani tests — log arrivals (names only)
   console.log(`tool ${tool} called`, Object.keys(args));
   try {
-    switch (tool) {
+    // One combined tool ("aangan_desk", action=…) so the Vaani console needs a single custom tool
+    const name = tool === "desk" ? String(args.action ?? "").replace(/_/g, "-") : tool;
+    switch (name) {
       case "lookup-caller":
         return Response.json(await lookupCaller(args));
       case "check-availability":
@@ -51,7 +53,10 @@ async function handle(req: Request, ctx: { params: Promise<{ tool: string }> }) 
       case "escalate":
         return Response.json(await escalate(args));
       default:
-        return Response.json({ error: `unknown tool ${tool}` }, { status: 404 });
+        return Response.json(
+          { ok: false, error: `unknown tool ${name || tool}`, say: "Something went wrong on my side. Use action check_availability, book_consultation or escalate." },
+          { status: tool === "desk" ? 200 : 404 },
+        );
     }
   } catch (err) {
     console.error(`tool ${tool} failed`, err);
