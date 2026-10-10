@@ -1,6 +1,6 @@
 import { and, eq, gte, isNull, lt, lte, notExists, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { fetchCall } from "./vaani";
+import { callEvents, fetchCall, normaliseCall } from "./vaani";
 import { processCall } from "./pipeline";
 import { notifyFrontDesk, raiseTask } from "./alerts";
 import { escapeHtml as e } from "./telegram";
@@ -27,7 +27,7 @@ async function retryCalls() {
   const db = getDb();
   const now = Date.now();
   const stuck = await db
-    .select({ id: schema.calls.vaaniCallId })
+    .select({ id: schema.calls.vaaniCallId, raw: schema.calls.rawPayload })
     .from(schema.calls)
     .where(
       and(
@@ -42,7 +42,11 @@ async function retryCalls() {
     .limit(5);
   let n = 0;
   for (const c of stuck) {
-    const full = await fetchCall(c.id);
+    // Prefer the webhook payload we stored (agent webhooks carry the transcript); else ask Vaani's API
+    const fromRaw = c.raw && typeof c.raw === "object"
+      ? callEvents(c.raw as Record<string, unknown>).map((e) => normaliseCall(e.data, { callId: e.callId, endedAt: e.at })).find((x) => x?.vaaniCallId === c.id)
+      : null;
+    const full = fromRaw?.transcript ? fromRaw : await fetchCall(c.id);
     if (full) {
       await processCall(full, "live");
       n++;

@@ -55,19 +55,38 @@ Use this once there are real designers with their own calendars. Our backend che
 Designers see bookings as normal events on their own calendar, with the client's details and a link to the call. No invite is emailed to the caller.
 
 ## 5. Vaani (you, with Claude reading along)
-1. **Phone number:** connect the Twilio number in the Vaani dashboard (Quick start → "Configure your Twilio number").
-2. **Flow:** create a conversation flow and paste everything below the `---` line in `docs/vaani-agent-prompt.md` as the agent's instructions. Set the female voice and languages to English + Hindi (+ Marathi if offered).
-3. **Tools during the call:** if the flow builder supports HTTP/API tools, add the four in the table below. Use POST and the header `x-aangan-tool-secret: <VAANI_TOOL_SECRET>`. If it doesn't support them, skip this step: the system books right after the call instead, and the designer confirms the time with the client.
-4. **Webhook:** Vaani dashboard → Webhooks → URL `https://<vercel-url>/api/vaani/webhook`, events `call.completed` and `call.failed`. Copy the `vv_whk_…` secret into `VAANI_WEBHOOK_SECRET` (in Vercel's settings too). Press **Test**; the endpoint answers the ping.
+The tab names below are the agent-editor tabs in the Vaani console. Option labels inside them may differ slightly; pick the closest one. **Save Agent** after each tab.
 
-| Tool | URL | Arguments |
+**Overview**
+- **Greeting:** "Namaste, you've reached Aangan Studio. I'm Aanya, the studio's AI assistant — this call is recorded so our designers have your details. How can I help?"
+- **System prompt:** everything below the `---` line in `docs/vaani-agent-prompt.md`.
+- Note the **₹/min** figure it shows, and put it in `VAANI_INR_PER_MINUTE` so the dashboard's costs are right.
+
+**Persona**
+- Female voice that sounds natural in Indian English (listen to a few). Languages: English (India) + Hindi (+ Marathi if offered), with auto-detect / code-switching ON.
+- Speech-to-text: a multilingual / Indian-languages model. If there's a keyword boost, add Pune localities (Kothrud, Baner, Aundh, Wakad, Hinjewadi, Pimple Saudagar…), plus BHK, carpet area, modular kitchen, possession.
+- LLM: a fast model; temperature low (~0.3); short responses.
+- **System tools:** `transfer_call` only once the front desk has a number to transfer to; everything else OFF. **Integration tools: all OFF.** Vaani's own booking tools would book outside our system, and Telegram and HubSpot would never hear about it.
+- **Custom tools:** add the four below (POST, header `Authorization: Bearer <VAANI_TOOL_SECRET>`).
+- **Memories → Use previous call contexts: ON** (repeat callers like T16 aren't re-asked everything).
+
+| Tool | URL (`https://aangan-voice-agent-rust.vercel.app` + …) | Parameters |
 |---|---|---|
 | `lookup_caller` | `/api/vaani/tools/lookup-caller` | `phone` |
-| `check_availability` | `/api/vaani/tools/check-availability` | `mode` (site_visit/studio), `preference` (free text, e.g. "weekends"), `from_date` (YYYY-MM-DD, when the caller wants a later date) |
-| `book_consultation` | `/api/vaani/tools/book-consultation` | `start` (ISO, from check_availability), `mode`, `name`, `phone`, `address`, `segment` |
+| `check_availability` | `/api/vaani/tools/check-availability` | `mode` (site_visit/studio), `preference` (e.g. "weekends"), `from_date` (YYYY-MM-DD, optional) |
+| `book_consultation` | `/api/vaani/tools/book-consultation` | `start` (exact value from check_availability), `mode`, `name`, `phone`, `address`, `segment` |
 | `escalate` | `/api/vaani/tools/escalate` | `reason`, `name`, `phone` |
 
-Every tool response includes `say`, a line the agent can speak as-is. Arguments are accepted flat or wrapped in `args` / `arguments` / `parameters`.
+Every response includes `say`, a line the agent can use as-is. If the tools don't fire on voice calls (they were reported failing in Vaani's chat tests), remove them: the system then books right after the call, and the designer confirms the time.
+
+**Training → Knowledge:** attach `knowledge/services.md` and `knowledge/qualified.md` only. **Never upload `pricing.md`.** An agent that can read the rates can say them, and keeping them out is what guarantees the Cut.
+
+**Experience:** interruptions ON. After ~7 s of silence say "Are you still there?"; after a second silence, end politely. Max call length 10 min. Record calls ON.
+
+**Deploy**
+1. **Webhook:** Developers → Webhooks → URL `https://aangan-voice-agent-rust.vercel.app/api/vaani/webhook`, event **Call Post-Processing** (send all call details). Copy the signing secret into `VAANI_WEBHOOK_SECRET`, both locally and in Vercel. Press **Test**; we answer test pings.
+2. **Web call** channel for the class demo; **Telephony** (Twilio number) for real calls.
+3. **Only voice calls send the webhook. Chat tests don't**, so test by talking to it.
 
 ## 6. Telegram (you + Claude)
 1. Each designer opens the bot and sends `/start`. The bot replies with their chat id.

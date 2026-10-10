@@ -17,18 +17,29 @@ const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 function authorised(req: Request) {
   const secret = process.env.VAANI_TOOL_SECRET;
-  const got = req.headers.get("x-aangan-tool-secret") ?? new URL(req.url).searchParams.get("key");
+  // Vaani custom tools let us set any header; accept "Authorization: Bearer …" or x-aangan-tool-secret
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const got = bearer || req.headers.get("x-aangan-tool-secret") || new URL(req.url).searchParams.get("key");
   if (!secret || !got) return false;
   const a = Buffer.from(secret);
   const b = Buffer.from(got);
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export async function POST(req: Request, ctx: { params: Promise<{ tool: string }> }) {
+async function handle(req: Request, ctx: { params: Promise<{ tool: string }> }) {
   if (!authorised(req)) return Response.json({ error: "unauthorised" }, { status: 401 });
   const { tool } = await ctx.params;
-  const body = (await req.json().catch(() => ({}))) as Args;
-  const args = ((body.args ?? body.arguments ?? body.parameters ?? body) as Args) || {};
+  const text = req.method === "GET" ? "" : await req.text();
+  let body: Args = {};
+  try {
+    body = text ? (JSON.parse(text) as Args) : {};
+  } catch {
+    body = Object.fromEntries(new URLSearchParams(text));
+  }
+  const nested = [body.args, body.arguments, body.parameters, body.params].find((v) => v && typeof v === "object") as Args | undefined;
+  const args: Args = { ...Object.fromEntries(new URL(req.url).searchParams), ...body, ...nested };
+  // Tool calls that never arrive were the main failure seen in Vaani tests — log arrivals (names only)
+  console.log(`tool ${tool} called`, Object.keys(args));
   try {
     switch (tool) {
       case "lookup-caller":
@@ -135,3 +146,6 @@ async function escalate(a: Args) {
       : `Flagged as urgent for the studio head. Someone senior will call by ${formatIst(due)}.`,
   };
 }
+
+export const POST = handle;
+export const GET = handle;

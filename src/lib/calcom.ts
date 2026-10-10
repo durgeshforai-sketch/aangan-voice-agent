@@ -56,9 +56,9 @@ export async function createBooking(input: {
       eventTypeId: eventTypeId(),
       attendee: {
         name: input.name,
-        // Cal.com requires an email; phone callers rarely give one reliably. Placeholder on a
-        // reserved domain (.invalid) so nothing is ever delivered to a stranger.
-        email: input.email || `${input.phone.replace(/\D/g, "")}@phone.aangan.invalid`,
+        // Cal.com requires an email; phone callers rarely give one reliably.
+        // Studio inbox if set (CALCOM_ATTENDEE_EMAIL), else a reserved .invalid address so nothing reaches a stranger
+        email: input.email || process.env.CALCOM_ATTENDEE_EMAIL || `${input.phone.replace(/\D/g, "")}@phone.aangan.invalid`,
         phoneNumber: input.phone,
         timeZone: TZ,
         language: "en",

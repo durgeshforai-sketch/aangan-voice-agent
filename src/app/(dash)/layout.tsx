@@ -10,6 +10,7 @@ export default function DashLayout({ children }: { children: React.ReactNode }) 
           <Link href="/">Overview</Link>
           <Link href="/calls">Calls</Link>
           <Link href="/queue">Front desk queue</Link>
+          <Link href="/try">Try a call</Link>
         </nav>
         <span className="spacer" />
       </header>

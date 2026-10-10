@@ -1,10 +1,19 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-// Vaani Labs integration. Documented: signed webhook envelope + GET /api/calls/{id}.
-// The call payload's fields are NOT documented ("defensive-parse — no sub-field is guaranteed"),
-// so everything below reads several candidate keys. Tighten once we've seen a real payload.
+// Vaani Labs integration.
+// Two webhook shapes exist and both are accepted:
+//  - What agent webhooks really send (observed 10 Oct 2026 by another MESA team on the same platform):
+//      header  x-webhook-signature: sha256=<hex HMAC of raw body>
+//      body    { event, timestamp, events: [{ event: "call_postprocessing", call_id, timestamp,
+//                data: { call_id, room_name, call_duration, end_reason, summary, entities, dispositions,
+//                        recording_url, transcript: "Agent: …\nUser: …" } }] }
+//  - What the public API docs describe: header X-VaaniVoice-Signature, body { id, type: "call.completed", data }.
+// Fields aren't guaranteed, so everything reads several candidate keys. Chat tests in Vaani send no webhook.
 
 const BASE = "https://www.vaanilabs.in";
+
+/** The signature header in either format. */
+export const signatureHeader = (h: Headers) => h.get("x-webhook-signature") ?? h.get("x-vaanivoice-signature");
 
 export function verifySignature(rawBody: string, header: string | null, secret = process.env.VAANI_WEBHOOK_SECRET) {
   if (!secret || !header) return false;
@@ -14,7 +23,25 @@ export function verifySignature(rawBody: string, header: string | null, secret =
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export type VaaniEnvelope = { id: string; type: string; created: number; data: Record<string, unknown> };
+const CALL_DONE = new Set(["call_postprocessing", "call.completed", "call_completed", "call.failed"]);
+export const isTestPing = (body: Record<string, unknown>) => /test|ping/i.test(String(body.event ?? body.type ?? ""));
+
+export type CallEvent = { event: string; callId: string | null; at: Date | null; data: Record<string, unknown> };
+
+/** Finished-call events from either envelope shape. Test pings and other events return []. */
+export function callEvents(body: Record<string, unknown>): CallEvent[] {
+  const toDate = (v: unknown) => (v == null ? null : date(v));
+  if (Array.isArray(body.events)) {
+    return (body.events as Record<string, unknown>[])
+      .filter((e) => e && CALL_DONE.has(String(e.event)) && e.data && typeof e.data === "object")
+      .map((e) => ({ event: String(e.event), callId: str(e.call_id), at: toDate(e.timestamp), data: e.data as Record<string, unknown> }));
+  }
+  const type = String(body.type ?? body.event ?? "");
+  if (CALL_DONE.has(type) && body.data && typeof body.data === "object") {
+    return [{ event: type, callId: null, at: toDate(body.created ?? body.timestamp), data: body.data as Record<string, unknown> }];
+  }
+  return [];
+}
 
 export type NormalisedCall = {
   vaaniCallId: string;
@@ -50,7 +77,7 @@ const date = (v: unknown) => {
 
 /** Transcript can arrive as a string or as turns [{role|speaker, text|content|message}]. */
 export function transcriptToText(t: unknown): string | null {
-  if (typeof t === "string") return t;
+  if (typeof t === "string") return t.trim() ? t.replace(/^(User|Customer|Human):/gim, "Caller:") : null;
   if (!Array.isArray(t)) return null;
   return t
     .map((turn: Obj) => {
@@ -62,24 +89,26 @@ export function transcriptToText(t: unknown): string | null {
     .join("\n");
 }
 
-export function normaliseCall(payload: Obj): NormalisedCall | null {
-  const c = (pick(payload, "call", "data.call", "data") as Obj | undefined) ?? payload;
-  const id = str(pick(c, "id", "call_id", "callId", "session_id", "sid"));
+export function normaliseCall(payload: Obj, fallback: { callId?: string | null; endedAt?: Date | null } = {}): NormalisedCall | null {
+  const c = (pick(payload, "call", "data.call") as Obj | undefined) ?? payload;
+  const id = str(pick(c, "call_id", "id", "callId", "session_id", "sid", "room_name")) ?? fallback.callId ?? null;
   if (!id) return null;
-  const startedAt = date(pick(c, "started_at", "startedAt", "start_time", "created_at")) ?? new Date();
-  const endedAt = date(pick(c, "ended_at", "endedAt", "end_time"));
-  const duration =
-    num(pick(c, "duration_sec", "duration_seconds", "duration", "units")) ??
-    (endedAt ? Math.round((endedAt.getTime() - startedAt.getTime()) / 1000) : null);
+  const durationRaw = num(pick(c, "call_duration", "duration_sec", "duration_seconds", "duration", "units"));
+  const endedAt = date(pick(c, "ended_at", "endedAt", "end_time")) ?? fallback.endedAt ?? null;
+  const startedAt =
+    date(pick(c, "started_at", "startedAt", "start_time", "call_start_time", "created_at")) ??
+    (endedAt && durationRaw != null ? new Date(endedAt.getTime() - durationRaw * 1000) : endedAt) ??
+    new Date();
+  const duration = durationRaw ?? (endedAt ? Math.round((endedAt.getTime() - startedAt.getTime()) / 1000) : null);
   const paise = num(pick(c, "cost_paise", "costPaise"));
   return {
     vaaniCallId: id,
-    fromPhone: str(pick(c, "from", "from_number", "caller", "caller_number", "phone", "customer.number")),
+    fromPhone: str(pick(c, "from", "from_number", "caller", "caller_number", "caller_id", "customer_number", "customer_phone", "user_number", "phone_number", "phone", "customer.number")),
     startedAt,
     endedAt,
     durationSec: duration,
-    transcript: transcriptToText(pick(c, "transcript", "transcription", "messages", "conversation")),
-    recordingUrl: str(pick(c, "recording_url", "recordingUrl", "recording", "recording.url")),
+    transcript: transcriptToText(pick(c, "transcript", "transcript_text", "transcription", "messages", "conversation")),
+    recordingUrl: str(pick(c, "recording_url", "recordingUrl", "recording", "recording.url", "audio_url")),
     language: str(pick(c, "language", "lang")),
     costInr: paise != null ? paise / 100 : num(pick(c, "cost_inr", "cost")),
     raw: payload,
