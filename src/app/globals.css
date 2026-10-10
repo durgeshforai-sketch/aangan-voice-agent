@@ -115,3 +115,4 @@ button { padding: 7px 12px; border-radius: 8px; border: 0; background: var(--ink
 .error { color: var(--critical); margin: 0; }
 .empty { color: var(--muted); padding: 24px 0; text-align: center; }
 .notice { padding: 10px 12px; border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--border); margin-bottom: 12px; color: var(--ink-2); }
+button.ghost { background: transparent; color: var(--ink-2); box-shadow: 0 0 0 1px var(--border); }

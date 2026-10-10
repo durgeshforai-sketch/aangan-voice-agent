@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { desc, eq } from "drizzle-orm";
+import { applyOutcome, OUTCOME_ACTIONS, type OutcomeAction } from "@/lib/outcomes";
 import { getDb, schema } from "@/db";
 import { ROUTE_LABEL, VerdictBadge, inr } from "@/components/ui";
 import { formatIst } from "@/lib/hours";
@@ -14,6 +16,26 @@ const CRITERIA_LABEL: Record<keyof Criteria, string> = {
   decisionMaker: "5 · Decision-maker",
 };
 const STATUS_ICON = { pass: "✓", fail: "✕", unclear: "?" };
+
+const ACTION_LABEL: Record<OutcomeAction, string> = {
+  confirm: "✅ Confirm",
+  reassign: "↪️ Reassign",
+  done: "Consult done",
+  noShow: "No-show",
+  proposal: "Proposal sent",
+  won: "Won 🎉",
+  lost: "Lost",
+  good: "👍 Good lead",
+  bad: "👎 Not worth it",
+};
+
+async function act(formData: FormData) {
+  "use server";
+  const action = String(formData.get("action")) as OutcomeAction;
+  if (!OUTCOME_ACTIONS.includes(action)) return;
+  await applyOutcome(String(formData.get("handoff")), action);
+  revalidatePath(`/calls/${String(formData.get("call"))}`);
+}
 
 export default async function CallDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,6 +57,16 @@ export default async function CallDetail({ params }: { params: Promise<{ id: str
     .leftJoin(schema.designers, eq(schema.designers.id, schema.bookings.designerId))
     .where(eq(schema.bookings.callId, id));
   const costs = await db.select().from(schema.costs).where(eq(schema.costs.callId, id));
+  const handoffs = q
+    ? await db
+        .select({ h: schema.handoffs, d: schema.designers })
+        .from(schema.handoffs)
+        .innerJoin(schema.designers, eq(schema.designers.id, schema.handoffs.designerId))
+        .where(eq(schema.handoffs.qualificationId, q.id))
+        .orderBy(desc(schema.handoffs.sentAt))
+    : [];
+  const current = handoffs.find((x) => !x.h.reassignedAt);
+  const [deal] = q ? await db.select().from(schema.deals).where(eq(schema.deals.qualificationId, q.id)) : [];
   const cost = costs.reduce((a, k) => a + Number(k.amountInr), 0);
 
   return (
@@ -83,6 +115,23 @@ export default async function CallDetail({ params }: { params: Promise<{ id: str
               {formatIst(b.startsAt)} · {b.mode.replace("_", " ")} · {d?.name ?? "unassigned"} · <span className="ink2">{b.status}{b.autoBooked ? " (auto, after call)" : ""}</span>
             </p>
           )) : <p className="muted">No booking.</p>}
+          {current && (
+            <>
+              <h2 style={{ marginTop: 16 }}>Consultant</h2>
+              <p style={{ margin: "4px 0" }}>
+                {current.d.name} · <span className="ink2">{current.h.confirmedAt ? `confirmed ${formatIst(current.h.confirmedAt)}` : "not confirmed yet"}</span>
+                {deal && <> · deal: <span className="ink2">{deal.stage.replace("_", " ")}</span></>}
+                {current.h.leadQuality && <> · {current.h.leadQuality === "up" ? "👍" : "👎"}</>}
+              </p>
+              <form action={act} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                <input type="hidden" name="handoff" value={current.h.id} />
+                <input type="hidden" name="call" value={id} />
+                {OUTCOME_ACTIONS.filter((a) => (current.h.confirmedAt ? a !== "confirm" : true)).map((a) => (
+                  <button key={a} type="submit" name="action" value={a} className={a === "confirm" ? "" : "ghost"}>{ACTION_LABEL[a]}</button>
+                ))}
+              </form>
+            </>
+          )}
         </div>
       </section>
       <section className="card">

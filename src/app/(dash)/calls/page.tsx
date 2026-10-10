@@ -1,18 +1,20 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { ROUTE_LABEL, VerdictBadge } from "@/components/ui";
 import { formatIst } from "@/lib/hours";
 import type { ExtractedLead } from "@/lib/lead";
 
-export default async function Calls({ searchParams }: { searchParams: Promise<{ origin?: string }> }) {
-  const origin = (await searchParams).origin === "simulation" ? "simulation" : "live";
+export default async function Calls({ searchParams }: { searchParams: Promise<{ origin?: string; phone?: string }> }) {
+  const sp = await searchParams;
+  const origin = sp.origin === "simulation" ? "simulation" : "live";
+  const phone = sp.phone?.trim() || null;
   const rows = await getDb()
     .select({ c: schema.calls, q: schema.qualifications, caller: schema.callers })
     .from(schema.calls)
     .leftJoin(schema.qualifications, eq(schema.qualifications.callId, schema.calls.id))
     .leftJoin(schema.callers, eq(schema.callers.id, schema.calls.callerId))
-    .where(eq(schema.calls.origin, origin))
+    .where(phone ? and(eq(schema.calls.origin, origin), eq(schema.callers.phone, phone)) : eq(schema.calls.origin, origin))
     .orderBy(desc(schema.calls.startedAt))
     .limit(200);
 

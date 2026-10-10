@@ -9,7 +9,7 @@ import { callbackDueAt, isStudioHours } from "./hours";
 import { raiseTask } from "./alerts";
 import { bookSlot, bookingConfigured, offerSlots } from "./booking";
 import { leastLoaded } from "./designers";
-import { handoffMessage, confirmButtons } from "./handoff";
+import { handoffMessage, confirmButtons, toPlain } from "./handoff";
 import { sendMessage } from "./telegram";
 
 // After every call: store → extract (Gemini) → decide (rules) → act (book / hand off / escalate / log).
@@ -191,8 +191,11 @@ async function bookAndHandOff(a: {
     ? (await db.select().from(schema.designers).where(eq(schema.designers.id, booking.designerId)))[0] ?? null
     : null;
 
+  const briefArgs = { lead: a.x.lead, q: a.q, summary: a.x.summary, phone: a.phone, estimatedValueInr: a.value, callUrl: a.callUrl };
+
   // No live booking (Vaani flow without tools, or the tool failed): book the first slot that fits
-  // what the caller said. The designer confirms the time with the client.
+  // what the caller said. The full brief goes in the booking notes, so it reaches the consultant in
+  // Cal.com's booking email. The consultant confirms the time with the client.
   if (!booking && bookingConfigured()) {
     try {
       const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1);
@@ -203,7 +206,8 @@ async function bookAndHandOff(a: {
           phone: a.caller.phone,
           mode,
           segment: a.x.lead.segment,
-          notes: a.x.summary,
+          notes: toPlain(handoffMessage({ ...briefArgs, bookingAt: null, bookingMode: null, forCalendar: true })) +
+            "\n\nSlot picked automatically after the call — please call the client to confirm it.",
           callerId: a.caller.id,
           callId: a.callId,
           autoBooked: true,
@@ -234,7 +238,7 @@ async function bookAndHandOff(a: {
     .values({ qualificationId: a.qualificationId, bookingId: booking?.id, designerId: designer.id, confirmBy: confirmDeadline(a.at) })
     .returning();
   const text =
-    handoffMessage({ lead: a.x.lead, q: a.q, summary: a.x.summary, phone: a.phone, bookingAt: booking?.startsAt ?? null, bookingMode: booking?.mode ?? null, estimatedValueInr: a.value, callUrl: a.callUrl }) +
+    handoffMessage({ ...briefArgs, bookingAt: booking?.startsAt ?? null, bookingMode: booking?.mode ?? null }) +
     (booking?.autoBooked ? "\n\n<i>Slot picked automatically after the call — please call the client to confirm it.</i>" : "");
   await db.update(schema.handoffs).set({ messageHtml: text }).where(eq(schema.handoffs.id, handoff.id));
   if (!designer.telegramChatId) return;

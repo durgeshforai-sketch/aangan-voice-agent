@@ -28,6 +28,7 @@ export function handoffMessage(args: {
   bookingMode: string | null;
   estimatedValueInr: number;
   callUrl: string;
+  forCalendar?: boolean; // the Cal.com email already shows the time, and has its own links
 }): string {
   const { lead: l, q } = args;
   const badge = q.verdict === "green" ? "🟢 Qualified" : "🟠 Qualified — check notes";
@@ -78,16 +79,28 @@ export function handoffMessage(args: {
     for (const f of flags) lines.push(f);
     for (const u of uncertain) lines.push(`❔ ${e(u)}`);
   }
+  lines.push("");
+  if (!args.forCalendar)
+    lines.push(
+      args.bookingAt
+        ? `<b>Consultation:</b> ${formatIst(args.bookingAt)} · ${args.bookingMode?.replace("_", " ")}`
+        : "<b>Consultation:</b> not booked yet — please call to fix a time",
+    );
   lines.push(
-    "",
-    args.bookingAt
-      ? `<b>Consultation:</b> ${formatIst(args.bookingAt)} · ${args.bookingMode?.replace("_", " ")}`
-      : "<b>Consultation:</b> not booked yet — please call to fix a time",
     "Already asked on the call: scope, area, size, timeline, decision-maker, source. <i>Don't re-ask; confirm.</i>",
-    `<a href="${args.callUrl}">Transcript + recording</a>`,
+    args.forCalendar ? `Transcript, recording + Confirm / outcome buttons: ${args.callUrl}` : `<a href="${args.callUrl}">Transcript + recording</a>`,
   );
   return lines.join("\n");
 }
+
+/** Plain text for places without HTML (Cal.com booking notes → the consultant's booking email). */
+export const toPlain = (html: string) =>
+  html
+    .replace(/<a href="([^"]+)">([^<]+)<\/a>/g, "$2: $1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 
 export const confirmButtons = (handoffId: string): Button[][] => [
   [
