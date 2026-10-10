@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { formatIst } from "@/lib/hours";
+import { liveTask } from "@/lib/live";
 
 const KIND_LABEL: Record<string, string> = {
   escalation: "🚨 Escalation",
@@ -31,12 +32,12 @@ export default async function Queue() {
     .select({ t: schema.escalations, caller: schema.callers })
     .from(schema.escalations)
     .leftJoin(schema.callers, eq(schema.callers.id, schema.escalations.callerId))
-    .where(isNull(schema.escalations.resolvedAt))
+    .where(and(isNull(schema.escalations.resolvedAt), liveTask))
     .orderBy(asc(schema.escalations.dueAt));
   const done = await db
     .select()
     .from(schema.escalations)
-    .where(and(isNotNull(schema.escalations.resolvedAt)))
+    .where(and(isNotNull(schema.escalations.resolvedAt), liveTask))
     .orderBy(desc(schema.escalations.resolvedAt))
     .limit(20);
   const now = new Date();

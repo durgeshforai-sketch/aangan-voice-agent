@@ -18,7 +18,8 @@
     "setup:telegram": "tsx scripts/setup-telegram.ts",
     "setup:hubspot": "tsx scripts/setup-hubspot.ts",
     "persona-cards": "tsx scripts/persona-cards.ts",
-    "calcom:event-types": "tsx scripts/calcom-event-types.ts"
+    "calcom:event-types": "tsx scripts/calcom-event-types.ts",
+    "simulate:main": "SIM_TARGET=main tsx scripts/simulate-pipeline.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

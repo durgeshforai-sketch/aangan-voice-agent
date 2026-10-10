@@ -89,17 +89,19 @@ export async function overview(r: Range, origin: "live" | "simulation") {
 
   const [designers] = await q(sql`
     select count(*) as handoffs,
-           count(*) filter (where confirmed_at is not null) as confirmed,
-           percentile_cont(0.5) within group (order by extract(epoch from confirmed_at - sent_at) / 60) as median_confirm_min,
-           count(*) filter (where lead_quality = 'up') as up,
-           count(*) filter (where lead_quality = 'down') as down
-    from handoffs where sent_at >= ${from}`);
+           count(*) filter (where h.confirmed_at is not null) as confirmed,
+           percentile_cont(0.5) within group (order by extract(epoch from h.confirmed_at - h.sent_at) / 60) as median_confirm_min,
+           count(*) filter (where h.lead_quality = 'up') as up,
+           count(*) filter (where h.lead_quality = 'down') as down
+    from handoffs h join qualifications q on q.id = h.qualification_id join calls c on c.id = q.call_id
+    where h.sent_at >= ${from} and c.origin = ${origin}`);
 
   const [tasks] = await q(sql`
-    select count(*) filter (where resolved_at is null) as open,
-           count(*) filter (where resolved_at is null and due_at < now()) as overdue,
-           count(*) filter (where kind = 'guardrail' and created_at >= ${from}) as guardrail
-    from escalations`);
+    select count(*) filter (where e.resolved_at is null) as open,
+           count(*) filter (where e.resolved_at is null and e.due_at < now()) as overdue,
+           count(*) filter (where kind = 'guardrail' and e.created_at >= ${from}) as guardrail
+    from escalations e left join calls c on c.id = e.call_id
+    where coalesce(c.origin, 'live') = ${origin}`);
 
   const fixed = await q(sql`select coalesce(sum(amount_inr), 0) as inr from costs where call_id is null and occurred_at >= ${from}`);
 

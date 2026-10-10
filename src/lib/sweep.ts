@@ -7,6 +7,7 @@ import { escapeHtml as e } from "./telegram";
 import { formatIst, callbackDueAt } from "./hours";
 import { upsertContact, upsertDeal } from "./hubspot";
 import type { ExtractedLead } from "./lead";
+import { liveDeal, liveQualification, liveTask } from "./live";
 
 // Runs every ~10 minutes (GitHub Actions → /api/cron/sweep). Each step is independent and idempotent.
 export async function sweep() {
@@ -62,7 +63,7 @@ async function overdueHandoffs() {
     .from(schema.handoffs)
     .innerJoin(schema.designers, eq(schema.designers.id, schema.handoffs.designerId))
     .innerJoin(schema.qualifications, eq(schema.qualifications.id, schema.handoffs.qualificationId))
-    .where(and(lt(schema.handoffs.confirmBy, new Date()), isNull(schema.handoffs.confirmedAt), isNull(schema.handoffs.reassignedAt), isNull(schema.handoffs.overdueAlertedAt)));
+    .where(and(lt(schema.handoffs.confirmBy, new Date()), isNull(schema.handoffs.confirmedAt), isNull(schema.handoffs.reassignedAt), isNull(schema.handoffs.overdueAlertedAt), liveQualification));
   for (const r of rows) {
     const lead = r.q.extracted as ExtractedLead;
     await raiseTask({
@@ -87,6 +88,7 @@ async function overdueTasks() {
     .where(
       and(
         isNull(schema.escalations.resolvedAt),
+        liveTask,
         lt(schema.escalations.dueAt, now),
         or(isNull(schema.escalations.lastAlertedAt), lt(schema.escalations.lastAlertedAt, new Date(now.getTime() - 30 * 60_000))),
       ),
@@ -105,7 +107,7 @@ async function nurtureDue() {
     .select({ d: schema.deals, c: schema.callers })
     .from(schema.deals)
     .innerJoin(schema.callers, eq(schema.callers.id, schema.deals.callerId))
-    .where(and(eq(schema.deals.stage, "nurture"), lte(schema.deals.followUpOn, today)));
+    .where(and(eq(schema.deals.stage, "nurture"), lte(schema.deals.followUpOn, today), liveDeal));
   for (const r of rows) {
     await raiseTask({
       kind: "nurture_due",
@@ -126,7 +128,7 @@ async function syncHubspot() {
     .from(schema.deals)
     .innerJoin(schema.callers, eq(schema.callers.id, schema.deals.callerId))
     .leftJoin(schema.qualifications, eq(schema.qualifications.id, schema.deals.qualificationId))
-    .where(isNull(schema.deals.hubspotSyncedAt))
+    .where(and(isNull(schema.deals.hubspotSyncedAt), liveDeal))
     .limit(20);
   for (const r of rows) {
     const lead = r.q?.extracted as ExtractedLead | undefined;
