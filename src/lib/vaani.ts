@@ -77,7 +77,14 @@ const date = (v: unknown) => {
 
 /** Transcript can arrive as a string or as turns [{role|speaker, text|content|message}]. */
 export function transcriptToText(t: unknown): string | null {
-  if (typeof t === "string") return t.trim() ? t.replace(/^(User|Customer|Human):/gim, "Caller:") : null;
+  if (typeof t === "string") {
+    if (!t.trim()) return null;
+    // Real calls: "[15:23:07] AGENT: …" / "[15:23:10] USER: …" → "Agent: …" / "Caller: …"
+    return t
+      .replace(/^\s*\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/gm, "")
+      .replace(/^(AGENT|ASSISTANT|BOT)\s*:/gim, "Agent:")
+      .replace(/^(USER|CUSTOMER|HUMAN|CALLER)\s*:/gim, "Caller:");
+  }
   if (!Array.isArray(t)) return null;
   return t
     .map((turn: Obj) => {
@@ -99,7 +106,8 @@ export function normaliseCall(payload: Obj, fallback: { callId?: string | null; 
     date(pick(c, "started_at", "startedAt", "start_time", "call_start_time", "created_at")) ??
     (endedAt && durationRaw != null ? new Date(endedAt.getTime() - durationRaw * 1000) : endedAt) ??
     new Date();
-  const duration = durationRaw ?? (endedAt ? Math.round((endedAt.getTime() - startedAt.getTime()) / 1000) : null);
+  // Vaani reports fractional seconds (237.06); the column is an integer
+  const duration = durationRaw != null ? Math.round(durationRaw) : endedAt ? Math.round((endedAt.getTime() - startedAt.getTime()) / 1000) : null;
   const paise = num(pick(c, "cost_paise", "costPaise"));
   return {
     vaaniCallId: id,

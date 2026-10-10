@@ -36,6 +36,14 @@ describe("Vaani webhook parsing", () => {
     expect(c.recordingUrl).toBe("https://example.com/rec.mp3");
   });
 
+  it("handles a real voice call: fractional duration and [time] AGENT/USER labels", () => {
+    const body = { event: "call_postprocessing", events: [{ event: "call_postprocessing", call_id: "outbound-1", timestamp: "2026-10-10T15:27:01Z", data: { call_id: "outbound-1", call_duration: 237.06, transcript: "[15:23:07] AGENT: Namaste, Aangan Studio.\n[15:23:10] USER: Hi, 3BHK in Kothrud." } }] };
+    const [e] = callEvents(body);
+    const c = normaliseCall(e.data, { callId: e.callId, endedAt: e.at })!;
+    expect(c.durationSec).toBe(237);
+    expect(c.transcript).toBe("Agent: Namaste, Aangan Studio.\nCaller: Hi, 3BHK in Kothrud.");
+  });
+
   it("reads the documented call.completed envelope", () => {
     const doc = { id: "evt_1", type: "call.completed", created: 1760104800, data: { id: "c_9", duration: 60, transcript: [{ role: "assistant", text: "Hello" }, { role: "user", text: "Hi" }] } };
     const [e] = callEvents(doc);
