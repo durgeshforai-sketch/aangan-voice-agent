@@ -46,8 +46,16 @@ export async function createBooking(input: {
   mode: "site_visit" | "studio" | "video";
   address?: string | null;
   notes?: string;
+  link?: string; // always kept, even when the notes are trimmed
   metadata?: Record<string, string>;
 }): Promise<Booking> {
+  // Cal.com rejects long booking notes ("max_characters_allowed"). Keep the essentials + the link.
+  const NOTES_MAX = 480;
+  const head = [input.mode === "site_visit" ? `SITE VISIT${input.address ? `: ${input.address}` : ""}` : "Studio consultation", `Phone: ${input.phone}`].join("\n");
+  const tail = input.link ? `\nFull brief + buttons: ${input.link}` : "";
+  const room = NOTES_MAX - head.length - tail.length - 2;
+  const body = (input.notes ?? "").trim();
+  const notes = [head, body.length > room ? body.slice(0, Math.max(0, room - 1)).trimEnd() + "…" : body].filter(Boolean).join("\n") + tail;
   const res = await fetch(`${BASE}/bookings`, {
     method: "POST",
     headers: headers("2026-02-25"),
@@ -64,11 +72,7 @@ export async function createBooking(input: {
         language: "en",
       },
       // Address goes in the notes: a location type the event isn't configured for would reject the booking
-      bookingFieldsResponses: {
-        notes: [input.mode === "site_visit" ? `SITE VISIT${input.address ? `: ${input.address}` : ""}` : "Studio consultation", `Phone: ${input.phone}`, input.notes]
-          .filter(Boolean)
-          .join("\n"),
-      },
+      bookingFieldsResponses: { notes },
       metadata: { mode: input.mode, ...input.metadata },
     }),
   });

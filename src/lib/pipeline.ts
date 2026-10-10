@@ -9,7 +9,7 @@ import { callbackDueAt, isStudioHours } from "./hours";
 import { raiseTask } from "./alerts";
 import { bookSlot, bookingConfigured, offerSlots } from "./booking";
 import { leastLoaded } from "./designers";
-import { handoffMessage, confirmButtons, toPlain } from "./handoff";
+import { handoffMessage, confirmButtons } from "./handoff";
 import { sendMessage } from "./telegram";
 
 // After every call: store → extract (Gemini) → decide (rules) → act (book / hand off / escalate / log).
@@ -209,8 +209,13 @@ async function bookAndHandOff(a: {
           phone: a.caller.phone,
           mode,
           segment: a.x.lead.segment,
-          notes: toPlain(handoffMessage({ ...briefArgs, bookingAt: null, bookingMode: null, forCalendar: true })) +
-            "\n\nSlot picked automatically after the call — please call the client to confirm it.",
+          // Compact for Cal.com's notes limit; the full brief is behind the link
+          notes: [
+            "Auto-booked after the call: please call the client to confirm the time.",
+            a.x.summary,
+            a.q.flags.length ? `Flags: ${a.q.flags.join(", ").replaceAll("_", " ")}` : null,
+          ].filter(Boolean).join("\n"),
+          link: a.callUrl,
           callerId: a.caller.id,
           callId: a.callId,
           autoBooked: true,

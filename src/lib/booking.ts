@@ -51,6 +51,7 @@ export async function bookSlot(input: {
   address?: string | null;
   segment: string;
   notes?: string | null;
+  link?: string | null;
   callerId: string;
   callId?: string | null;
   autoBooked?: boolean;
@@ -67,6 +68,7 @@ export async function bookSlot(input: {
       mode: input.mode,
       address: input.address,
       notes: [designer ? `Consultant: ${designer.name}` : null, input.notes].filter(Boolean).join("\n"),
+      link: input.link ?? undefined,
       metadata: { ...(input.callId ? { callId: input.callId } : {}), ...(designer ? { consultant: designer.name.slice(0, 40) } : {}) },
     });
     const [booking] = await getDb()

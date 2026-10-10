@@ -110,8 +110,8 @@ async function book(a: Args) {
     .returning();
   // callId is attached after the call by the pipeline (Vaani's call id may not be known yet)
   // The call isn't finished yet, so the email links to this caller's calls; the full brief appears there after the call
-  const notes = [s(a.notes), `Full brief, transcript + Confirm/outcome buttons (after the call): ${process.env.APP_BASE_URL}/calls?phone=${encodeURIComponent(phone)}`].filter(Boolean).join("\n");
-  const r = await bookSlot({ start, name, phone, mode, address: s(a.address), segment: s(a.segment) ?? "residential", notes, callerId: caller.id });
+  const link = `${process.env.APP_BASE_URL}/calls?phone=${encodeURIComponent(phone)}`;
+  const r = await bookSlot({ start, name, phone, mode, address: s(a.address), segment: s(a.segment) ?? "residential", notes: s(a.notes), link, callerId: caller.id });
   if (!r) {
     const { slots } = await offerSlots(null, 2);
     return {
