@@ -156,31 +156,49 @@ export async function getEvent(calendarId: string, eventId: string) {
   );
 }
 
-/** Pick slots that match what the caller said: weekday evening / weekend / morning etc. */
+/**
+ * Pick slots that match what the caller said. "Saturday morning or Monday evening" is two clauses,
+ * each with its own day and time; a slot fits if it matches any clause. Handles W01's
+ * "weekdays after 6pm or weekends" and W03's "Saturday subah".
+ */
+const DAY_WORDS: [RegExp, string[]][] = [
+  [/monday|somvar/, ["Mon"]],
+  [/tuesday|mangalvar/, ["Tue"]],
+  [/wednesday|budhvar/, ["Wed"]],
+  [/thursday|guruvar/, ["Thu"]],
+  [/friday|shukravar/, ["Fri"]],
+  [/saturday|shanivar/, ["Sat"]],
+  [/sunday|ravivar/, ["Sun"]],
+  [/weekends?/, ["Sat", "Sun"]],
+  [/weekdays?/, ["Mon", "Tue", "Wed", "Thu", "Fri"]],
+];
+function clauseMatches(clause: string, wd: string, hr: number): boolean | null {
+  const days = DAY_WORDS.filter(([re]) => re.test(clause)).flatMap(([, d]) => d);
+  // "after 6pm" / "after 6" → that hour or later (afternoon/evening hours read as pm)
+  const after = clause.match(/after\s*(\d{1,2})\s*(am|pm)?/);
+  const afterHr = after ? Number(after[1]) + (after[2] === "am" || Number(after[1]) >= 12 ? 0 : Number(after[1]) <= 9 ? 12 : 0) : null;
+  const timeTest =
+    afterHr !== null
+      ? hr >= afterHr
+      : /morning|subah/.test(clause)
+        ? hr < 12
+        : /afternoon|dopahar/.test(clause)
+          ? hr >= 12 && hr < 17
+          : /evening|shaam/.test(clause)
+            ? hr >= 17
+            : null;
+  if (!days.length && timeTest === null) return null; // clause says nothing usable
+  return (!days.length || days.includes(wd)) && (timeTest ?? true);
+}
+
 export function filterByPreference<T extends { start: string }>(slots: T[], pref: string | null | undefined): T[] {
   if (!pref) return slots;
-  const p = pref.toLowerCase();
+  const clauses = pref.toLowerCase().split(/\bor\b|,|;|\/|\band\b|\bya\b/);
   const fmt = (s: T, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, ...o }).format(new Date(s.start));
-  // Named weekdays ("Tuesday or Thursday evening") narrow first; the time-of-day rules below still apply
-  const DAYS: [RegExp, string][] = [[/monday|somvar/, "Mon"], [/tuesday|mangalvar/, "Tue"], [/wednesday|budhvar/, "Wed"], [/thursday|guruvar/, "Thu"], [/friday|shukravar/, "Fri"], [/saturday|shanivar/, "Sat"], [/sunday|ravivar/, "Sun"]];
-  const named = DAYS.filter(([re]) => re.test(p)).map(([, d]) => d);
   return slots.filter((s) => {
     const wd = fmt(s, { weekday: "short" });
     const hr = Number(fmt(s, { hour: "numeric", hourCycle: "h23" }));
-    const weekend = wd === "Sat" || wd === "Sun";
-    if (named.length && !/weekend/.test(p)) {
-      if (!named.includes(wd)) return false;
-      if (/morning|subah/.test(p)) return hr < 12;
-      if (/afternoon|dopahar/.test(p)) return hr >= 12 && hr < 17;
-      if (/evening|after\s*[56]|shaam/.test(p)) return hr >= 17;
-      return true;
-    }
-    if (/weekend|saturday|sunday|shanivar|ravivar/.test(p) && /evening|after\s*6|after 6pm/.test(p)) return weekend || hr >= 18; // W01
-    if (/saturday|shanivar/.test(p) && !/sunday/.test(p)) return wd === "Sat" && (!/morning|subah/.test(p) || hr < 12);
-    if (/weekend/.test(p)) return weekend;
-    if (/evening|after\s*6|shaam/.test(p)) return hr >= 17;
-    if (/morning|subah/.test(p)) return hr < 12;
-    if (/afternoon|dopahar/.test(p)) return hr >= 12 && hr < 17;
-    return true;
+    const results = clauses.map((c) => clauseMatches(c, wd, hr)).filter((r) => r !== null);
+    return results.length === 0 || results.some(Boolean);
   });
 }

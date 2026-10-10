@@ -7,7 +7,7 @@ const ist = (s: string) => new Date(`${s}+05:30`);
 describe("consultation slots", () => {
   // Fri 9 Oct 2026, 3pm IST
   const from = ist("2026-10-09T15:00:00");
-  const cands = candidateSlots(from, 3, C, from);
+  const cands = candidateSlots(from, 4, C, from);
 
   it("starts no earlier than the lead time and skips Sundays", () => {
     expect(cands[0].start.toISOString()).toBe(ist("2026-10-10T11:00:00").toISOString()); // Sat 11am (20h after Fri 3pm)
@@ -43,6 +43,14 @@ describe("consultation slots", () => {
     })).toBe(true);
     const tueThuEve = filterByPreference(slots, "Tuesday or Thursday evening");
     expect(tueThuEve.every((s) => ["Tue", "Thu"].includes(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short" }).format(new Date(s.start))))).toBe(true);
+    const mixed = filterByPreference(slots, "Saturday morning or Monday evening");
+    expect(mixed.length).toBeGreaterThan(0);
+    expect(mixed.every((s) => {
+      const d = new Date(s.start);
+      const wd = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short" }).format(d);
+      const hr = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "numeric", hourCycle: "h23" }).format(d));
+      return (wd === "Sat" && hr < 12) || (wd === "Mon" && hr >= 17);
+    })).toBe(true);
     const satMorning = filterByPreference(slots, "Koi bhi Saturday subah"); // W03
     expect(satMorning.length).toBeGreaterThan(0);
     expect(satMorning.every((s) => s.start.startsWith("2026-10-10") && new Date(s.start) < ist("2026-10-10T12:00:00"))).toBe(true);

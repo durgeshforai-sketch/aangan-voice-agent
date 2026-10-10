@@ -198,8 +198,9 @@ async function bookAndHandOff(a: {
   // Cal.com's booking email. The consultant confirms the time with the client.
   if (!booking && bookingConfigured()) {
     try {
-      // Respect a later date the caller gave (possession, moving out, preferred start)
-      const later = [a.x.lead.siteAvailableFrom, a.x.lead.preferredStart].filter(Boolean).sort().pop() ?? null;
+      // A site visit needs the site: wait for possession / move-out. A preferred *execution* start
+      // ("January start") doesn't delay the first consultation.
+      const later = mode === "site_visit" ? a.x.lead.siteAvailableFrom : null;
       const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1, later);
       if (slots[0]) {
         const r = await bookSlot({
