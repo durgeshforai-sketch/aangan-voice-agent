@@ -16,6 +16,8 @@ const { readFileSync } = await import("node:fs");
 const { seedCases } = await import("../eval/seed-cases");
 const { processCall } = await import("../src/lib/pipeline");
 
+// A unique fake mobile per enquiry: T01 → +91 98221 00001, W01 → +91 98222 00001, F01 → +91 98223 00001
+const simPhone = (id: string) => `+919822${{ T: 1, W: 2, F: 3 }[id[0] as "T" | "W" | "F"]}${id.slice(1).padStart(5, "0")}`;
 const DURATION: Record<string, number> = { phone: 300, whatsapp: 280, form: 240 };
 const only = process.argv.slice(2);
 for (const c of seedCases.filter((x) => !only.length || only.includes(x.id))) {
@@ -24,7 +26,7 @@ for (const c of seedCases.filter((x) => !only.length || only.includes(x.id))) {
   const r = await processCall(
     {
       vaaniCallId: `sim-${c.id}`,
-      fromPhone: `+9198220${c.id.replace(/\D/g, "").padStart(5, "1")}`,
+      fromPhone: simPhone(c.id),
       startedAt,
       endedAt: new Date(startedAt.getTime() + DURATION[c.channel] * 1000),
       durationSec: c.id === "T08" ? 4 : DURATION[c.channel],
