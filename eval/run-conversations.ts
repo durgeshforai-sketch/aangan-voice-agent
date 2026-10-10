@@ -158,7 +158,7 @@ async function runCase(c: SeedCase): Promise<string[]> {
       if (bookableNow && !conv.booked) problems.push("qualified but not booked on the call");
       if (c.expect.route === "close" && conv.booked) problems.push("booked a lead that should be declined");
     } else {
-      if (bookableNow && !ASKED_TIMES.test(agent)) problems.push("qualified but never asked for preferred days/times");
+      if (bookableNow && !ASKED_TIMES.test(agent) && !extraction.lead.availabilityNotes) problems.push("qualified but never asked for preferred days/times");
       if (CLAIMED_BOOKED.test(agent)) problems.push("claimed a slot is booked (it isn't until after the call)");
     }
     const turns = conv.transcript.split("\n").length;
