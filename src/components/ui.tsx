@@ -57,3 +57,27 @@ export function Filters({ base, current, items }: { base: string; current: strin
     </div>
   );
 }
+
+// Which calls the dashboard counts. During the test stage DASHBOARD_DEFAULT_VIEW=all shows real and
+// test calls together; at go-live set it to "live" (or remove it) so only real calls count.
+export type View = "live" | "simulation" | "all";
+export const parseView = (v: string | undefined): View =>
+  v === "live" || v === "simulation" || v === "all" ? v : process.env.DASHBOARD_DEFAULT_VIEW === "all" ? "all" : "live";
+
+const VIEWS: { key: View; label: string }[] = [
+  { key: "all", label: "All calls" },
+  { key: "live", label: "Live only" },
+  { key: "simulation", label: "Test only" },
+];
+
+export function ViewSwitch({ path, view, extra = "" }: { path: string; view: View; extra?: string }) {
+  return (
+    <div className="filters" role="group" aria-label="Which calls">
+      {VIEWS.map((v) => (
+        <Link key={v.key} className="chip" href={`${path}?view=${v.key}${extra}`} aria-current={v.key === view}>
+          {v.label}
+        </Link>
+      ))}
+    </div>
+  );
+}

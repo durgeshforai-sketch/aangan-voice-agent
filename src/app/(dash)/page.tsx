@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import Link from "next/link";
 import { overview, RANGES, type Range } from "@/lib/metrics";
-import { Filters, Kpi, inr, pct } from "@/components/ui";
+import { Filters, Kpi, ViewSwitch, inr, parseView, pct } from "@/components/ui";
 import { ValueBars, WeeklyOutcomes } from "@/components/charts";
 
 const STAGE_LABEL: Record<string, string> = {
@@ -13,12 +13,12 @@ const STAGE_LABEL: Record<string, string> = {
   lost: "Lost",
 };
 
-export default async function Overview({ searchParams }: { searchParams: Promise<{ range?: string; origin?: string }> }) {
+export default async function Overview({ searchParams }: { searchParams: Promise<{ range?: string; view?: string }> }) {
   await connection(); // per-request: these pages read the clock and the database
   const sp = await searchParams;
-  const origin = sp.origin === "simulation" ? "simulation" : "live";
-  // The seed enquiries are from September, so test calls open on 90 days
-  const range = (RANGES.some((r) => r.key === sp.range) ? sp.range : origin === "simulation" ? "90d" : "30d") as Range;
+  const origin = parseView(sp.view);
+  // The seed enquiries are from September, so any view with test calls opens on 90 days
+  const range = (RANGES.some((r) => r.key === sp.range) ? sp.range : origin === "live" ? "30d" : "90d") as Range;
   const m = await overview(range, origin);
 
   const leads = m.verdict.green + m.verdict.amber + m.verdict.red;
@@ -28,12 +28,11 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   return (
     <>
       <div className="filters" style={{ justifyContent: "space-between" }}>
-        <Filters base={origin === "simulation" ? "/?origin=simulation" : "/"} current={range} items={RANGES} />
-        <Link className="chip" href={origin === "live" ? "/?origin=simulation" : `/?range=${range}`}>
-          {origin === "live" ? "Show test calls" : "← Back to live calls"}
-        </Link>
+        <Filters base={`/?view=${origin}`} current={range} items={RANGES} />
+        <ViewSwitch path="/" view={origin} extra={`&range=${range}`} />
       </div>
-      {origin === "simulation" && <div className="notice">Showing simulated test calls from the eval suite — not real enquiries.</div>}
+      {origin === "all" && <div className="notice">Test stage: counting real calls and the 40 September test enquiries together. Switch to “Live only” for real calls.</div>}
+      {origin === "simulation" && <div className="notice">Showing test calls only — the September enquiries and end-to-end tests, not real callers.</div>}
       {m.tasks.guardrail > 0 && (
         <div className="notice" style={{ boxShadow: "0 0 0 1.5px var(--critical)" }}>
           🛑 {m.tasks.guardrail} call(s) flagged for a possible price quote. <Link href="/queue">Review now</Link>
