@@ -19,7 +19,8 @@
     "setup:hubspot": "tsx scripts/setup-hubspot.ts",
     "persona-cards": "tsx scripts/persona-cards.ts",
     "calcom:event-types": "tsx scripts/calcom-event-types.ts",
-    "simulate:main": "SIM_TARGET=main tsx scripts/simulate-pipeline.ts"
+    "simulate:main": "SIM_TARGET=main tsx scripts/simulate-pipeline.ts",
+    "hubspot:trial": "tsx scripts/hubspot-trial.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",
