@@ -161,10 +161,20 @@ export function filterByPreference<T extends { start: string }>(slots: T[], pref
   if (!pref) return slots;
   const p = pref.toLowerCase();
   const fmt = (s: T, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, ...o }).format(new Date(s.start));
+  // Named weekdays ("Tuesday or Thursday evening") narrow first; the time-of-day rules below still apply
+  const DAYS: [RegExp, string][] = [[/monday|somvar/, "Mon"], [/tuesday|mangalvar/, "Tue"], [/wednesday|budhvar/, "Wed"], [/thursday|guruvar/, "Thu"], [/friday|shukravar/, "Fri"], [/saturday|shanivar/, "Sat"], [/sunday|ravivar/, "Sun"]];
+  const named = DAYS.filter(([re]) => re.test(p)).map(([, d]) => d);
   return slots.filter((s) => {
     const wd = fmt(s, { weekday: "short" });
     const hr = Number(fmt(s, { hour: "numeric", hourCycle: "h23" }));
     const weekend = wd === "Sat" || wd === "Sun";
+    if (named.length && !/weekend/.test(p)) {
+      if (!named.includes(wd)) return false;
+      if (/morning|subah/.test(p)) return hr < 12;
+      if (/afternoon|dopahar/.test(p)) return hr >= 12 && hr < 17;
+      if (/evening|after\s*[56]|shaam/.test(p)) return hr >= 17;
+      return true;
+    }
     if (/weekend|saturday|sunday|shanivar|ravivar/.test(p) && /evening|after\s*6|after 6pm/.test(p)) return weekend || hr >= 18; // W01
     if (/saturday|shanivar/.test(p) && !/sunday/.test(p)) return wd === "Sat" && (!/morning|subah/.test(p) || hr < 12);
     if (/weekend/.test(p)) return weekend;

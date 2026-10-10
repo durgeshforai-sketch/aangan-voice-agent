@@ -17,6 +17,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 const AGENT_PROMPT = readFileSync("docs/vaani-agent-prompt.md", "utf8").split(/^---$/m)[1];
 const MAX_TURNS = 18;
+// The live Vaani flow has no custom tools (Vaani doesn't attach them); booking happens after the call
+const USE_TOOLS = process.env.EVAL_TOOLS === "1";
 
 // With an agent that asks the right questions, some historical outcomes legitimately improve
 // (e.g. "review" becomes bookable once scope is asked). These are the acceptable routes per label.
@@ -86,7 +88,7 @@ async function converse(c: SeedCase) {
     // Agent speaks (resolving any tool calls first)
     let agentText = "";
     for (let hop = 0; hop < 4; hop++) {
-      const res = await withRetry(() => ai.models.generateContent({ model: MODEL, contents: agentHistory, config: { systemInstruction: AGENT_PROMPT, tools: TOOLS, temperature: 0.4 } }));
+      const res = await withRetry(() => ai.models.generateContent({ model: MODEL, contents: agentHistory, config: { systemInstruction: AGENT_PROMPT, ...(USE_TOOLS ? { tools: TOOLS } : {}), temperature: 0.4 } }));
       const content = res.candidates?.[0]?.content;
       if (!content) break;
       agentHistory.push(content);
@@ -123,6 +125,8 @@ const agentLines = (t: string) => t.split("\n").filter((l) => l.startsWith("Agen
 const PROMISE = /(i('| wi)ll|we('| wi)ll|let me) (send|share|whatsapp|email|forward)/i;
 const PRICE = /(₹|rs\.?\s?\d|rupees|\d[\d,.]*\s*(lakh|lac|lakhs|k\b|thousand|crore)|per\s*(sq|square)\s*(ft|feet|foot))/i;
 const ASKED_TIMELINE = /(when would you|need it (complete|done|finished)|timeline|by when|kab tak)/i;
+const ASKED_TIMES = /(days?|times?|when).{0,40}(suit|work|convenient|prefer)|which days|what time/i;
+const CLAIMED_BOOKED = /(is|are|you're|you are|has been|have been) (now )?(booked|confirmed) for|booked you (in )?for|confirmed for (mon|tue|wed|thu|fri|sat|sun|\d)/i;
 const ASKED_DECIDER = /(anyone else|who else|involved in (the )?decid|decision|decide)/i;
 
 const only = process.argv.slice(2);
@@ -150,8 +154,13 @@ async function runCase(c: SeedCase): Promise<string[]> {
     const bookableNow = q.route === "book" || q.route === "book_with_note";
     if (isLead && c.expect.route !== "close" && !ASKED_TIMELINE.test(agent) && !extraction.lead.completionNeededBy && !extraction.lead.timelineFlexible && !extraction.lead.siteAvailableFrom && !extraction.lead.preferredStart && extraction.lead.scopeLevel !== "unknown") problems.push("never asked about timeline");
     if (isLead && bookableNow && !ASKED_DECIDER.test(agent) && extraction.lead.decisionMaker === "unknown") problems.push("never asked who decides");
-    if (bookableNow && !conv.booked) problems.push("qualified but not booked on the call");
-    if (c.expect.route === "close" && conv.booked) problems.push("booked a lead that should be declined");
+    if (USE_TOOLS) {
+      if (bookableNow && !conv.booked) problems.push("qualified but not booked on the call");
+      if (c.expect.route === "close" && conv.booked) problems.push("booked a lead that should be declined");
+    } else {
+      if (bookableNow && !ASKED_TIMES.test(agent)) problems.push("qualified but never asked for preferred days/times");
+      if (CLAIMED_BOOKED.test(agent)) problems.push("claimed a slot is booked (it isn't until after the call)");
+    }
     const turns = conv.transcript.split("\n").length;
     out.push(`${problems.length ? "✗" : "✓"} ${c.id.padEnd(4)} ${q.verdict}/${q.route}${conv.booked ? " · booked" : ""} · ${turns} lines`);
     for (const p of problems) out.push(`      · ${p}`);

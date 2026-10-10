@@ -41,6 +41,8 @@ describe("consultation slots", () => {
       const hr = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "numeric", hourCycle: "h23" }).format(d));
       return wd === "Sat" || hr >= 18;
     })).toBe(true);
+    const tueThuEve = filterByPreference(slots, "Tuesday or Thursday evening");
+    expect(tueThuEve.every((s) => ["Tue", "Thu"].includes(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short" }).format(new Date(s.start))))).toBe(true);
     const satMorning = filterByPreference(slots, "Koi bhi Saturday subah"); // W03
     expect(satMorning.length).toBeGreaterThan(0);
     expect(satMorning.every((s) => s.start.startsWith("2026-10-10") && new Date(s.start) < ist("2026-10-10T12:00:00"))).toBe(true);

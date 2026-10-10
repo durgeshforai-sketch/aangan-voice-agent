@@ -198,7 +198,9 @@ async function bookAndHandOff(a: {
   // Cal.com's booking email. The consultant confirms the time with the client.
   if (!booking && bookingConfigured()) {
     try {
-      const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1);
+      // Respect a later date the caller gave (possession, moving out, preferred start)
+      const later = [a.x.lead.siteAvailableFrom, a.x.lead.preferredStart].filter(Boolean).sort().pop() ?? null;
+      const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1, later);
       if (slots[0]) {
         const r = await bookSlot({
           start: slots[0].start,
