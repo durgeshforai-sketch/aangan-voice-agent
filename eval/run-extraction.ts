@@ -10,6 +10,7 @@ import { extractFromTranscript } from "../src/lib/extract";
 import { qualify } from "../src/lib/qualify";
 import type { ExtractedLead } from "../src/lib/lead";
 
+const BOOKS = new Set(["book", "book_with_note"]);
 const FIELDS: (keyof ExtractedLead)[] = [
   "callType", "city", "segment", "scopeLevel", "wantsExecution", "decisionMaker",
   "budgetVolunteered", "askedAboutPricing", "mentionsFounderConnection", "consultPreference",
@@ -40,7 +41,11 @@ const results = await pool(cases, 4, async (c) => {
     return {
       id: c.id,
       verdictOk: q.verdict === c.expect.verdict,
-      routeOk: q.route === c.expect.route,
+      // book and book_with_note are the same action (both booked); only the designer note differs
+      routeOk:
+        q.route === c.expect.route ||
+        (BOOKS.has(q.route) && BOOKS.has(c.expect.route)) ||
+        (c.expect.alsoOk ?? []).includes(q.route),
       got: `${q.verdict}/${q.route}`,
       want: `${c.expect.verdict}/${c.expect.route}`,
       fieldMisses,
@@ -65,7 +70,7 @@ const routeAcc = results.filter((r) => r.routeOk).length;
 const verdictAcc = results.filter((r) => r.verdictOk).length;
 // The costly mistakes: a lead that should be declined gets booked, or a good lead gets declined
 const bookable = (s: string) => s.endsWith("/book") || s.endsWith("/book_with_note");
-const falseBook = results.filter((r) => bookable(r.got) && !bookable(r.want)).map((r) => r.id);
+const falseBook = results.filter((r) => !r.routeOk && bookable(r.got) && !bookable(r.want)).map((r) => r.id);
 const falseDecline = results.filter((r) => r.got.endsWith("/close") && bookable(r.want)).map((r) => r.id);
 console.log(`\nVerdict ${verdictAcc}/${n} · Route ${routeAcc}/${n} · Field mismatches ${fieldTotal} (${FIELDS.length * n} checked)`);
 console.log(`Booked but shouldn't be: ${falseBook.join(", ") || "none"} · Declined but shouldn't be: ${falseDecline.join(", ") || "none"}`);

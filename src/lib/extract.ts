@@ -23,11 +23,15 @@ export type Extraction = z.infer<typeof Extraction>;
 const SYSTEM = `You extract structured facts from enquiry call transcripts for Aangan Studio, an interior design studio in Pune.
 Rules:
 - Only record what the caller actually said. If something wasn't said, use null / "unknown" / "unclear". Never guess.
-- Dates: resolve relative dates ("by March", "before Diwali", "in six weeks") against the call date given. Month-only → last day of that month. Diwali 2026 is 8 November; but if the caller says how many weeks away it is, use that.
+- Dates: resolve relative dates ("by March", "in six weeks") against the call date given. Month-only → last day of that month. For occasions ("before Diwali", "before guests arrive"), use what the conversation says about how far away it is.
+- siteAvailableFrom vs preferredStart: "possession in 6 weeks" / "we'll move out in February" = siteAvailableFrom. "January start would be ideal" / "execution from December" = preferredStart. A home they already live in or own empty is available now (null).
+- callType "returning_enquiry": they contacted Aangan before about this NEW project and are following up (often annoyed nobody replied). That is a lead, not a complaint.
 - city: "pune" for Pune city localities, "pcmc" for Pimpri-Chinchwad localities (Pimpri, Chinchwad, Pimple Saudagar, Pimple Nilakh, Ravet, Hinjewadi, Wakad is Pune), "other" for anywhere else (Talegaon, Lonavala, Nashik, Mumbai...), "unknown" if not said.
 - budget: only if the caller volunteered a number. "Budget bhi hai" / "reasonable" is NOT a number.
 - decisionMaker: "self" if the caller owns it or is the founder/co-owner; "authorised" if they say the decision-maker has agreed; "represented" if calling for owners who'll decide; "research_only" if just checking for someone else.
 - scopeLevel "full_home" covers full home and full office fitouts. Only "partial" when they name specific rooms and not the whole home.
+- wantsExecution: callers rarely say "execution". "yes" when they want spaces redone, redesigned, done up, fitted out, interiors done, a modular kitchen / wardrobes made, or "end-to-end". "no" only when they want ideas, suggestions, advice, styling, or will execute themselves. "unclear" only when they've said nothing about what they want done (e.g. only asked for a brochure or a price).
+- decisionMaker: "self" also when the caller speaks as the owner ("I have a 2BHK", "my flat", "we bought") and nothing suggests someone else decides.
 - agentQuotedPrice: true only if the assistant/front desk stated a price figure. A caller mentioning their own budget does not count.`;
 
 export type ExtractionResult = { extraction: Extraction; model: string; inputTokens: number; outputTokens: number };

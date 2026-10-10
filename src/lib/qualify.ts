@@ -20,7 +20,8 @@ export type Qualification = { verdict: Verdict; route: Route; criteria: Criteria
 export const RULES = {
   minWeeksToCompletion: 8, // under this: cannot serve (qualified.md: room = 8–10 weeks end to end)
   comfortableWeeksToCompletion: 12, // 8–12 weeks: possible but tight → designer must set expectations
-  maxWeeksUntilSiteAvailable: 10, // qualified.md: site available within 8–10 weeks of consultation
+  maxWeeksUntilSiteAvailable: 10, // qualified.md: site available within 8–10 weeks of consultation…
+  siteTooFarWeeks: 26, // …but a serious lead whose site opens later is booked with a note, not declined (F06)
   commercialMinSqft: 500, // front-desk practice (T18), not in services.md → amber, not red
   commercialMaxSqft: 3000, // services.md: "up to approximately 3,000 sq ft"
   budgetClearlyBelowRatio: 0.6, // volunteered max < 60% of lowest plausible cost → misaligned
@@ -69,10 +70,12 @@ function timeline(l: ExtractedLead, now: Date): CriterionResult {
   }
   if (l.siteAvailableFrom) {
     const weeks = weeksBetween(now, new Date(l.siteAvailableFrom));
+    if (weeks > RULES.siteTooFarWeeks)
+      return { status: "fail", reason: `Site not workable for ~${Math.round(weeks)} weeks` };
     if (weeks > RULES.maxWeeksUntilSiteAvailable)
-      return { status: "fail", reason: `Site not available for ~${Math.round(weeks)} weeks` };
+      return { status: "unclear", reason: `Site workable in ~${Math.round(weeks)} weeks — design can start now, execution later` };
   }
-  if (l.completionNeededBy || l.siteAvailableFrom || l.timelineFlexible)
+  if (l.completionNeededBy || l.siteAvailableFrom || l.preferredStart || l.timelineFlexible)
     return { status: "pass", reason: l.timelineNotes ?? "Timeline workable" };
   return { status: "unclear", reason: "Timeline not established" };
 }
@@ -136,8 +139,9 @@ export function qualify(l: ExtractedLead, now = new Date()): Qualification {
   const fails = Object.entries(criteria).filter(([, r]) => r.status === "fail").map(([k]) => k);
 
   if (fails.length > 0) {
-    // Only the timeline is wrong and the caller would start later → keep the relationship warm
-    const nurture = fails.length === 1 && fails[0] === "timeline" && l.openToLaterStart === true;
+    // Only the timeline is wrong and it's a "not yet", not a "never" → keep the relationship warm
+    const notYet = l.openToLaterStart === true || criteria.timeline.reason.startsWith("Site not workable");
+    const nurture = fails.length === 1 && fails[0] === "timeline" && notYet;
     return { verdict: "red", route: nurture ? "nurture" : "close", criteria, flags };
   }
   if (l.readiness === "exploring") return { verdict: "amber", route: "nurture", criteria, flags };

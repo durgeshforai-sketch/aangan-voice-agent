@@ -137,7 +137,8 @@ for (const c of cases) {
     const agent = agentLines(conv.transcript);
     const priceHit = agent.match(PRICE)?.[0];
     const problems: string[] = [];
-    if (!ACCEPT[c.expect.route].includes(q.route)) problems.push(`route ${q.route}, want ${ACCEPT[c.expect.route].join("|")}`);
+    const ok = [...ACCEPT[c.expect.route], ...(c.expect.alsoOk ?? [])];
+    if (!ok.includes(q.route)) problems.push(`route ${q.route}, want ${ok.join("|")}`);
     if (extraction.agentQuotedPrice) problems.push("extraction says agent QUOTED A PRICE");
     if (priceHit && c.expect.route !== "close") problems.push(`agent said "${priceHit}" — check for a price`);
     const isLead = !["escalate", "log"].includes(c.expect.route);

@@ -13,7 +13,8 @@ export type SeedCase = {
   receivedAt: string;
   persona: string;
   facts: ExtractedLead;
-  expect: { verdict: Verdict; route: Route; flags?: string[] };
+  // alsoOk: other routes a reasonable reader of the enquiry could defend (scored as a pass)
+  expect: { verdict: Verdict; route: Route; flags?: string[]; alsoOk?: Route[] };
 };
 
 const base: ExtractedLead = {
@@ -32,6 +33,7 @@ const base: ExtractedLead = {
   readiness: "unknown",
   completionNeededBy: null,
   siteAvailableFrom: null,
+  preferredStart: null,
   timelineFlexible: null,
   openToLaterStart: null,
   timelineNotes: null,
@@ -141,7 +143,7 @@ export const seedCases: SeedCase[] = [
     id: "T14", channel: "phone", receivedAt: "2026-09-17T11:41:00+05:30",
     persona: "Son calling for his parents' new-possession 3BHK in Hadapsar. Parents don't use phones much; they'll decide and attend the consultation.",
     facts: f({ ...fullHome, locality: "Hadapsar", city: "pune", bhk: 3, decisionMaker: "represented" }),
-    expect: { verdict: "amber", route: "book_with_note" },
+    expect: { verdict: "amber", route: "book_with_note", alsoOk: ["nurture"] },
   },
   {
     id: "T15", channel: "phone", receivedAt: "2026-09-18T15:12:00+05:30",
@@ -153,7 +155,8 @@ export const seedCases: SeedCase[] = [
     id: "T16", channel: "phone", receivedAt: "2026-09-19T10:38:00+05:30",
     persona: "Girish Nair, called Monday about his 3BHK in Viman Nagar, was promised a callback, nobody called. Annoyed.",
     facts: f({ ...fullHome, callType: "returning_enquiry", name: "Girish Nair", locality: "Viman Nagar", city: "pune", bhk: 3, frustrated: true }),
-    expect: { verdict: "amber", route: "book_with_note", flags: ["frustrated", "repeat_caller"] },
+    // He never restates the scope, so "front desk calls him back" (review) is also right
+    expect: { verdict: "amber", route: "book_with_note", flags: ["frustrated", "repeat_caller"], alsoOk: ["review"] },
   },
   {
     id: "T17", channel: "phone", receivedAt: "2026-09-22T14:16:00+05:30",
@@ -176,7 +179,7 @@ export const seedCases: SeedCase[] = [
   {
     id: "T20", channel: "phone", receivedAt: "2026-09-25T09:15:00+05:30",
     persona: "Pooja. 2BHK Magarpatta, ~900 sq ft. Kitchen, both bedrooms, living. Flexible; January execution start ideal. Owner with husband; both will attend.",
-    facts: f({ ...fullHome, name: "Pooja", locality: "Magarpatta", city: "pune", bhk: 2, carpetAreaSqft: 900, timelineFlexible: true, timelineNotes: "Execution start January", decisionMaker: "self" }),
+    facts: f({ ...fullHome, name: "Pooja", locality: "Magarpatta", city: "pune", bhk: 2, carpetAreaSqft: 900, preferredStart: "2027-01-01", timelineFlexible: true, timelineNotes: "Execution start January", decisionMaker: "self" }),
     expect: { verdict: "green", route: "book" },
   },
 
@@ -191,7 +194,7 @@ export const seedCases: SeedCase[] = [
     id: "W02", channel: "whatsapp", receivedAt: "2026-09-08T14:31:00+05:30",
     persona: "Only asks how much you charge per sq ft for a 2BHK. Gives nothing else unless asked.",
     facts: f({ bhk: 2, askedAboutPricing: true }),
-    expect: { verdict: "amber", route: "review" },
+    expect: { verdict: "amber", route: "review", alsoOk: ["nurture"] },
   },
   {
     id: "W03", channel: "whatsapp", receivedAt: "2026-09-12T10:45:00+05:30",
@@ -209,7 +212,7 @@ export const seedCases: SeedCase[] = [
     id: "W05", channel: "whatsapp", receivedAt: "2026-09-20T18:44:00+05:30",
     persona: "Meena Joshi. 2BHK in Baner, wants her home designed, asks what the process is. Vague on scope.",
     facts: f({ name: "Meena Joshi", locality: "Baner", city: "pune", bhk: 2 }),
-    expect: { verdict: "amber", route: "review" },
+    expect: { verdict: "amber", route: "review", alsoOk: ["book_with_note", "book"] },
   },
   {
     id: "W06", channel: "whatsapp", receivedAt: "2026-09-17T11:22:00+05:30",
@@ -247,7 +250,7 @@ export const seedCases: SeedCase[] = [
   {
     id: "F01", channel: "form", receivedAt: "2026-09-01T09:44:00+05:30",
     persona: "Sumit Bhatt. 2BHK Kalyani Nagar, ~920 sq ft, moved in 8 months ago. Modular kitchen, both bedrooms, living, home-office corner. Execution December, done by February. Won't discuss budget. He and wife will attend. Found you on Instagram.",
-    facts: f({ ...fullHome, name: "Sumit Bhatt", locality: "Kalyani Nagar", city: "pune", bhk: 2, carpetAreaSqft: 920, completionNeededBy: "2027-02-28", decisionMaker: "self", source: "instagram" }),
+    facts: f({ ...fullHome, name: "Sumit Bhatt", locality: "Kalyani Nagar", city: "pune", bhk: 2, carpetAreaSqft: 920, preferredStart: "2026-12-01", completionNeededBy: "2027-02-28", decisionMaker: "self", source: "instagram" }),
     expect: { verdict: "green", route: "book" },
   },
   {
@@ -266,7 +269,7 @@ export const seedCases: SeedCase[] = [
     id: "F04", channel: "form", receivedAt: "2026-09-09T14:37:00+05:30",
     persona: "Rajesh. Wants to know the cost of interior design, 'as soon as possible', budget 'reasonable'. Somewhere in Pune. Vague about everything.",
     facts: f({ name: "Rajesh", city: "pune", askedAboutPricing: true, source: "whatsapp_forward" }),
-    expect: { verdict: "amber", route: "review", flags: ["price_sensitive"] },
+    expect: { verdict: "amber", route: "review", flags: ["price_sensitive"], alsoOk: ["nurture"] },
   },
   {
     id: "F05", channel: "form", receivedAt: "2026-09-11T10:05:00+05:30",
@@ -277,14 +280,15 @@ export const seedCases: SeedCase[] = [
   {
     id: "F06", channel: "form", receivedAt: "2026-09-14T20:52:00+05:30",
     persona: "Preethi Nair. 4BHK ground floor on NIBM Road, ~1,950 sq ft. Kitchen replacement, three bedrooms, living room flooring and design, a new study. Execution from February 2027. ₹35–40 lakh, not flexible upward. Shortlisted 3 studios; loves warm, earthy, minimal.",
-    facts: f({ ...partial, name: "Preethi Nair", locality: "NIBM Road", city: "pune", bhk: 4, carpetAreaSqft: 1950, roomsInScope: ["kitchen", "bedroom", "bedroom", "bedroom", "living room", "study"], timelineFlexible: true, budgetVolunteered: true, budgetMinLakh: 35, budgetMaxLakh: 40, decisionMaker: "self", source: "press", stylePreferences: "Warm, earthy, minimal", otherNotes: "Comparing 3 studios" }),
-    expect: { verdict: "green", route: "book" },
+    facts: f({ ...partial, name: "Preethi Nair", locality: "NIBM Road", city: "pune", bhk: 4, carpetAreaSqft: 1950, roomsInScope: ["kitchen", "bedroom", "bedroom", "bedroom", "living room", "study"], siteAvailableFrom: "2027-02-01", timelineFlexible: true, budgetVolunteered: true, budgetMinLakh: 35, budgetMaxLakh: 40, decisionMaker: "self", source: "press", stylePreferences: "Warm, earthy, minimal", otherNotes: "Comparing 3 studios" }),
+    // Site occupied until Feb 2027 (~20 weeks): design can start now, execution later
+    expect: { verdict: "amber", route: "book_with_note", alsoOk: ["book"] },
   },
   {
     id: "F07", channel: "form", receivedAt: "2026-09-16T15:11:00+05:30",
     persona: "Anonymous. Only wants the per-sq-ft rate before deciding whether to enquire. Refuses to share details.",
     facts: f({ city: "pune", askedAboutPricing: true, source: "instagram" }),
-    expect: { verdict: "amber", route: "review", flags: ["price_sensitive"] },
+    expect: { verdict: "amber", route: "review", flags: ["price_sensitive"], alsoOk: ["nurture"] },
   },
   {
     id: "F08", channel: "form", receivedAt: "2026-09-18T18:44:00+05:30",

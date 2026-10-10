@@ -12,7 +12,9 @@ export const ExtractedLead = z.object({
     "silent_or_dropped",
     "other",
   ]),
-  complaint: z.boolean().describe("Caller is complaining about service or an ongoing project"),
+  complaint: z
+    .boolean()
+    .describe("Complaint about an ongoing or past Aangan PROJECT. Being annoyed that nobody returned an enquiry is NOT a complaint (that's frustrated + returning_enquiry)."),
 
   name: z.string().nullable(),
   locality: z.string().nullable().describe("Neighbourhood or town as the caller said it, e.g. 'Kothrud', 'Talegaon Dabhade'"),
@@ -49,10 +51,19 @@ export const ExtractedLead = z.object({
   ]),
   roomsInScope: z.array(z.string()).describe("e.g. ['kitchen', 'living room', 'master bedroom']"),
   wantsExecution: z.enum(["yes", "no", "unclear"]),
-  readiness: z.enum(["ready", "exploring", "unknown"]).describe("'just exploring', 'early stage' → exploring"),
+  readiness: z
+    .enum(["ready", "exploring", "unknown"])
+    .describe("'exploring' only if they say they're not planning to go ahead soon / just collecting ideas or brochures. A real property with a real need is 'ready' even if they're checking first."),
 
   completionNeededBy: z.string().nullable().describe("ISO date the project must be finished; month-only → last day of that month"),
-  siteAvailableFrom: z.string().nullable().describe("ISO date the site can be worked on (possession date etc.)"),
+  siteAvailableFrom: z
+    .string()
+    .nullable()
+    .describe("ISO date the site PHYSICALLY becomes workable (possession, tenants/owners moving out). Null if it's available now or not said."),
+  preferredStart: z
+    .string()
+    .nullable()
+    .describe("ISO date the caller would LIKE design or execution to start, if they said. A preference, not a constraint."),
   timelineFlexible: z.boolean().nullable().describe("'no rush', 'flexible', 'whenever'"),
   openToLaterStart: z.boolean().nullable().describe("If the timeline is too tight, caller said they could start later"),
   timelineNotes: z.string().nullable(),
