@@ -66,7 +66,7 @@ export type DealInput = {
 export async function upsertDeal(d: DealInput): Promise<string> {
   const properties: Record<string, string> = {
     dealname: d.name,
-    pipeline: process.env.HUBSPOT_PIPELINE_ID ?? "default",
+    pipeline: process.env.HUBSPOT_PIPELINE_ID || "default",
     dealstage: stageId(d.stage),
     amount: d.amountInr != null ? String(d.amountInr) : "",
     aangan_verdict: d.verdict ?? "",
