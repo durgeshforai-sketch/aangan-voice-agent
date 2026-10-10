@@ -7,7 +7,7 @@ import { estimatedValueInr } from "./estimate";
 import { geminiCostInr, vaaniCostInr } from "./costs";
 import { callbackDueAt, isStudioHours } from "./hours";
 import { raiseTask } from "./alerts";
-import { bookSlot, offerSlots } from "./booking";
+import { bookSlot, bookingConfigured, offerSlots } from "./booking";
 import { leastLoaded } from "./designers";
 import { handoffMessage, confirmButtons } from "./handoff";
 import { sendMessage } from "./telegram";
@@ -193,7 +193,7 @@ async function bookAndHandOff(a: {
 
   // No live booking (Vaani flow without tools, or the tool failed): book the first slot that fits
   // what the caller said. The designer confirms the time with the client.
-  if (!booking && process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  if (!booking && bookingConfigured()) {
     try {
       const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1);
       if (slots[0]) {

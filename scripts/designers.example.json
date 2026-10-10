@@ -1,4 +1,4 @@
 [
-  { "name": "Designer One", "telegramChatId": "", "calendarId": "", "specialties": ["residential"] },
-  { "name": "Designer Two", "telegramChatId": "", "calendarId": "", "specialties": ["residential", "commercial"] }
+  { "name": "Consultant One", "telegramChatId": "", "specialties": ["residential", "commercial"] },
+  { "name": "Consultant Two", "telegramChatId": "", "specialties": ["residential"], "active": false }
 ]

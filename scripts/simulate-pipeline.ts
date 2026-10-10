@@ -1,12 +1,12 @@
 // Runs the 40 seed transcripts through the FULL post-call pipeline (store → Gemini → rules → tasks/deals)
 // against the Neon TEST branch, as origin=simulation. Lets you see the dashboard populated end to end.
-// Telegram / Google Calendar / HubSpot are switched off for this run so nobody gets pinged.
+// Telegram / calendars / HubSpot are switched off for this run so nobody gets pinged.
 //   npm run simulate             (all)      npm run simulate -- T01 T09
 import { config } from "dotenv";
 config({ path: ".env.local" });
 if (!process.env.DATABASE_URL_TEST) throw new Error("Set DATABASE_URL_TEST (Neon test branch) first");
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST;
-for (const k of ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ESCALATION_CHAT_ID", "GOOGLE_SERVICE_ACCOUNT_JSON", "HUBSPOT_ACCESS_TOKEN"]) delete process.env[k];
+for (const k of ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ESCALATION_CHAT_ID", "GOOGLE_SERVICE_ACCOUNT_JSON", "CALCOM_API_KEY", "HUBSPOT_ACCESS_TOKEN"]) delete process.env[k];
 
 const { readFileSync } = await import("node:fs");
 const { seedCases } = await import("../eval/seed-cases");

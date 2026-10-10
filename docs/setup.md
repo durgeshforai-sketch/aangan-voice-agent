@@ -13,7 +13,8 @@ Open `.env.local` and fill in the blank entries. `VAANI_TOOL_SECRET`, `TELEGRAM_
 | `VAANI_WEBHOOK_SECRET` | Step 5. It's shown once, when you register the webhook |
 | `VAANI_INR_PER_MINUTE` | Your per-minute rate on the Vaani billing page |
 | `GEMINI_API_KEY` | Google AI Studio |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Step 4 |
+| `CALCOM_API_KEY`, `CALCOM_EVENT_TYPE_ID` | Step 4 (Option A) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Step 4 (Option B, later) |
 | `TELEGRAM_BOT_TOKEN` | @BotFather |
 | `TELEGRAM_ESCALATION_CHAT_ID` | Step 6 |
 | `DASHBOARD_PASSWORD` | Choose one for Nikhil and the front desk |
@@ -34,13 +35,21 @@ npm run simulate               # full pipeline on the Neon test branch → dashb
 ```
 Fix the prompt until `eval:conversations` passes. **Zero price quotes is non-negotiable.**
 
-## 4. Google Calendar (you, ~10 minutes, free)
-We use Google Calendar instead of Cal.com, because Cal.com's round-robin needs a paid Teams plan. Our backend does the round-robin itself (least-loaded, commercial specialists first).
+## 4. Booking calendar (you)
+### Option A — one free Cal.com account (`BOOKING_PROVIDER=calcom`, the default; used for testing)
+Cal.com's team round-robin is a paid plan, so we use a single free account. Every consultation lands on that account's calendar, and our backend decides which consultant it's for: least-loaded, commercial specialists first. "Consultant One" is used for testing.
+1. Cal.com → **Event Types → New** → **"Free design consultation"**, 60 min. Set the availability to consultation hours (e.g. Mon–Sat 10:00–19:00 IST).
+2. Turn off emails to attendees if you can (Event type → Advanced). Callers get a placeholder address, because phone callers rarely give an email.
+3. Cal.com → Settings → Developer → **API keys** → put the key in `CALCOM_API_KEY`.
+4. `npm run calcom:event-types` lists your event types with their ids. Put the consultation's id in `CALCOM_EVENT_TYPE_ID`.
+
+### Option B — Google Calendar per designer (`BOOKING_PROVIDER=gcal`, free)
+Use this once there are real designers with their own calendars. Our backend checks who is free and does the round-robin itself (least-loaded, commercial specialists first).
 1. Go to https://console.cloud.google.com → create a project, e.g. **aangan-voice-agent**.
 2. **APIs & Services → Library** → enable **Google Calendar API**.
 3. **IAM & Admin → Service Accounts → Create**, named e.g. `aangan-booking`. It needs no roles.
 4. Open it → **Keys → Add key → JSON**. A file downloads. Paste its entire contents as one line into `GOOGLE_SERVICE_ACCOUNT_JSON`, or base64 it with `base64 -i key.json`. Then delete the downloaded file.
-5. Each designer (start with 2–3 test calendars): Google Calendar → ⚙ **Settings → their calendar → Share with specific people** → add the service account's `client_email` (`…@…iam.gserviceaccount.com`) with **"Make changes to events"**. Their calendar id is usually their Gmail address; it goes in `scripts/designers.json` as `calendarId`.
+5. Each designer (start with 2–3 test calendars): Google Calendar → ⚙ **Settings → their calendar → Share with specific people** → add the service account's `client_email` (`…@…iam.gserviceaccount.com`) with **"Make changes to events"**. Each designer's calendar id is usually their Gmail address; it goes in `scripts/designers.json` as `calendarId`.
 6. Consultation hours default to Mon–Sat 10:00–19:00 IST in 60-minute slots. Change them with `CONSULT_*` if needed.
 
 Designers see bookings as normal events on their own calendar, with the client's details and a link to the call. No invite is emailed to the caller.
