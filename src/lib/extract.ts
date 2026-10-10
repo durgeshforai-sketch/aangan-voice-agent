@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { ExtractedLead } from "./lead";
+import { withRetry } from "./retry";
 
 // Gemini Flash reads the transcript and returns facts. It does NOT decide — qualify.ts does.
 
@@ -42,7 +43,7 @@ export async function extractFromTranscript(transcript: string, callDate: Date):
   const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
   const ai = new GoogleGenAI({ apiKey });
 
-  const res = await ai.models.generateContent({
+  const res = await withRetry(() => ai.models.generateContent({
     model,
     contents: `Call date: ${callDate.toISOString().slice(0, 10)} (Asia/Kolkata)\n\nTranscript:\n${transcript}`,
     config: {
@@ -51,7 +52,7 @@ export async function extractFromTranscript(transcript: string, callDate: Date):
       responseJsonSchema: z.toJSONSchema(Extraction),
       temperature: 0,
     },
-  });
+  }));
 
   const extraction = Extraction.parse(JSON.parse(res.text ?? ""));
   const u = res.usageMetadata;

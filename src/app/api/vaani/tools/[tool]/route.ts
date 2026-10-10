@@ -1,8 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { createBooking, filterByPreference, getSlots } from "@/lib/calcom";
-import { designerForBooking } from "@/lib/designers";
+import { bookSlot, offerSlots } from "@/lib/booking";
 import { callbackDueAt, formatIst, isStudioHours } from "@/lib/hours";
 import { normalisePhone } from "@/lib/pipeline";
 import { raiseTask } from "@/lib/alerts";
@@ -71,17 +70,13 @@ async function lookupCaller(a: Args) {
 }
 
 async function checkAvailability(a: Args) {
-  const from = new Date(Date.now() + 24 * 3600_000);
-  const all = await getSlots(from, new Date(from.getTime() + 10 * 24 * 3600_000));
-  const fitting = filterByPreference(all, s(a.preference));
-  const chosen = (fitting.length ? fitting : all).slice(0, 4);
-  if (!chosen.length) return { ok: false, slots: [], say: "No slots are open in the next ten days. Offer to have the studio call back with a time." };
-  const offer = chosen.slice(0, 2).map((x) => formatIst(new Date(x.start)));
+  const { slots, matchedPreference } = await offerSlots(s(a.preference));
+  if (!slots.length) return { ok: false, slots: [], say: "No slots are open in the next ten days. Offer to have the studio call back with a time." };
   return {
     ok: true,
-    slots: chosen.map((x) => ({ start: x.start, label: formatIst(new Date(x.start)) })),
-    matchedPreference: fitting.length > 0,
-    say: `Offer these two: ${offer.join(" or ")}.`,
+    slots,
+    matchedPreference,
+    say: `Offer these two: ${slots.slice(0, 2).map((x) => x.label).join(" or ")}.${matchedPreference ? "" : " Nothing matched their preference exactly — say so."}`,
   };
 }
 
@@ -97,14 +92,20 @@ async function book(a: Args) {
     .values({ phone, name })
     .onConflictDoUpdate({ target: schema.callers.phone, set: { name } })
     .returning();
-  const b = await createBooking({ start, name, phone, mode, address: s(a.address), notes: s(a.notes) ?? undefined });
-  const designer = await designerForBooking(b.hosts[0] ?? null, s(a.segment) ?? "residential");
   // callId is attached after the call by the pipeline (Vaani's call id may not be known yet)
-  await db.insert(schema.bookings).values({ callerId: caller.id, designerId: designer?.id, calcomBookingUid: b.uid, startsAt: new Date(b.start), mode });
-  const when = formatIst(new Date(b.start));
+  const r = await bookSlot({ start, name, phone, mode, address: s(a.address), segment: s(a.segment) ?? "residential", notes: s(a.notes), callerId: caller.id });
+  if (!r) {
+    const { slots } = await offerSlots(null, 2);
+    return {
+      ok: false,
+      slots,
+      say: slots.length ? `That slot was just taken. Offer: ${slots.map((x) => x.label).join(" or ")}.` : "That slot was just taken. Say the studio will call to confirm a time.",
+    };
+  }
+  const when = formatIst(r.booking.startsAt);
   return {
     ok: true,
-    bookingId: b.uid,
+    bookingId: r.booking.id,
     when,
     say: `Booked: ${when}, ${mode.replace("_", " ")}. Read it back to them, and tell them their designer will have everything they've shared.`,
   };

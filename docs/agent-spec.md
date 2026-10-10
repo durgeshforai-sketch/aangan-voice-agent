@@ -106,7 +106,7 @@ Triggers: an existing client complaint, an angry caller asking for Nikhil, anyth
 | Tool | When | Returns |
 |---|---|---|
 | `lookup_caller(phone)` | Call start | new / repeat caller (with previous notes) / existing client (with project + designer) |
-| `check_availability(mode, preferences)` | Before offering slots | 2–4 slots across the designer team (Cal.com round-robin) |
+| `check_availability(mode, preferences)` | Before offering slots | 2–4 slots where at least one designer is free (Google Calendar; we assign least-loaded) |
 | `book_consultation(slot, mode, name, phone, address?)` | Caller agrees | Booking id + confirmed time |
 | `transfer_to_human()` | Escalation during hours | — |
 | `escalate(reason, callback_by)` | Escalation, or a failed transfer | Escalation id |
@@ -119,7 +119,9 @@ Decided 2026-10-10. Change these in `RULES` in `src/lib/qualify.ts`.
 
 | Question | Decision | Why |
 |---|---|---|
-| Timeline cut-off | Completion needed in < 8 weeks → decline. 8–12 weeks → book with a "tight timeline" note. | qualified.md: a room takes 8–10 weeks end to end. services.md's "6 weeks" is the bare minimum to *start*. |
+| Timeline cut-off | Rooms: completion in < 8 weeks → decline; 8–12 → book with a "tight" note. Full home/office: < 11 → decline; 11–16 → tight. | qualified.md: a room takes 8–10 weeks end to end. services.md: design 3–4 weeks + execution 8–16. Its "6 weeks" is the bare minimum to *start*. |
+| Site opens later | Site workable in 10–26 weeks → book with a note (design can start now). > 26 weeks → nurture. | A ₹35–40L lead planning ahead (F06) shouldn't be declined. |
+| Frustrated follow-ups | "Nobody called me back" is a lead to win back, not a complaint | T16, W08 |
 | Site availability | Site not workable for > 10 weeks → nurture or decline | qualified.md: site available within 8–10 weeks of the consultation |
 | Small commercial | < 500 sq ft → review, not auto-decline | The front desk declined T18, but no written rule says so |
 | One failed criterion | Decline on the call | qualified.md: "If it fails one, close gracefully" |

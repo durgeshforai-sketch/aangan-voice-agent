@@ -11,6 +11,7 @@ import { GoogleGenAI, type Content } from "@google/genai";
 import { seedCases, type SeedCase } from "./seed-cases";
 import { extractFromTranscript } from "../src/lib/extract";
 import { qualify, type Route } from "../src/lib/qualify";
+import { withRetry } from "../src/lib/retry";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
@@ -85,7 +86,7 @@ async function converse(c: SeedCase) {
     // Agent speaks (resolving any tool calls first)
     let agentText = "";
     for (let hop = 0; hop < 4; hop++) {
-      const res = await ai.models.generateContent({ model: MODEL, contents: agentHistory, config: { systemInstruction: AGENT_PROMPT, tools: TOOLS, temperature: 0.4 } });
+      const res = await withRetry(() => ai.models.generateContent({ model: MODEL, contents: agentHistory, config: { systemInstruction: AGENT_PROMPT, tools: TOOLS, temperature: 0.4 } }));
       const content = res.candidates?.[0]?.content;
       if (!content) break;
       agentHistory.push(content);
@@ -107,7 +108,7 @@ async function converse(c: SeedCase) {
     callerHistory.push({ role: "user", parts: [{ text: agentText }] });
 
     // Caller replies
-    const r = await ai.models.generateContent({ model: MODEL, contents: callerHistory, config: { systemInstruction: callerSystem(c), temperature: 0.7 } });
+    const r = await withRetry(() => ai.models.generateContent({ model: MODEL, contents: callerHistory, config: { systemInstruction: callerSystem(c), temperature: 0.7 } }));
     const said = (r.text ?? "").trim();
     if (said.includes("[END]")) break;
     callerHistory.push({ role: "model", parts: [{ text: said }] });
@@ -128,7 +129,8 @@ const cases = seedCases.filter((c) => !only.length || only.includes(c.id));
 mkdirSync("eval/out", { recursive: true });
 let fails = 0;
 
-for (const c of cases) {
+async function runCase(c: SeedCase): Promise<string[]> {
+  const out: string[] = [];
   try {
     const conv = await converse(c);
     writeFileSync(`eval/out/${c.id}.txt`, conv.full + "\n");
@@ -148,13 +150,21 @@ for (const c of cases) {
     if (bookableNow && !conv.booked) problems.push("qualified but not booked on the call");
     if (c.expect.route === "close" && conv.booked) problems.push("booked a lead that should be declined");
     const turns = conv.transcript.split("\n").length;
-    console.log(`${problems.length ? "✗" : "✓"} ${c.id.padEnd(4)} ${q.verdict}/${q.route}${conv.booked ? " · booked" : ""} · ${turns} lines`);
-    for (const p of problems) console.log(`      · ${p}`);
+    out.push(`${problems.length ? "✗" : "✓"} ${c.id.padEnd(4)} ${q.verdict}/${q.route}${conv.booked ? " · booked" : ""} · ${turns} lines`);
+    for (const p of problems) out.push(`      · ${p}`);
     if (problems.length) fails++;
   } catch (err) {
     fails++;
-    console.log(`✗ ${c.id} ERROR ${String(err).slice(0, 160)}`);
+    out.push(`✗ ${c.id} ERROR ${String(err).slice(0, 160)}`);
   }
+  return out;
 }
+
+const queue = [...cases];
+await Promise.all(
+  Array.from({ length: 4 }, async () => {
+    for (let c = queue.shift(); c; c = queue.shift()) console.log((await runCase(c)).join("\n"));
+  }),
+);
 console.log(`\n${cases.length - fails}/${cases.length} conversations passed. Transcripts in eval/out/.`);
 process.exit(fails ? 1 : 0);

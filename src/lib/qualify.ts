@@ -18,8 +18,10 @@ export type Qualification = { verdict: Verdict; route: Route; criteria: Criteria
 
 // Rule choices where the seed files disagree — decided 2026-10-10, see docs/agent-spec.md
 export const RULES = {
-  minWeeksToCompletion: 8, // under this: cannot serve (qualified.md: room = 8–10 weeks end to end)
-  comfortableWeeksToCompletion: 12, // 8–12 weeks: possible but tight → designer must set expectations
+  // Weeks from the call to the caller's completion deadline. Under min: decline. min–comfortable: tight, book with a note.
+  // Rooms (qualified.md): 8–10 weeks end to end. Full home/office (services.md): 3–4 weeks design + 8–16 execution.
+  roomWeeks: { min: 8, comfortable: 12 },
+  fullWeeks: { min: 11, comfortable: 16 },
   maxWeeksUntilSiteAvailable: 10, // qualified.md: site available within 8–10 weeks of consultation…
   siteTooFarWeeks: 26, // …but a serious lead whose site opens later is booked with a note, not declined (F06)
   commercialMinSqft: 500, // front-desk practice (T18), not in services.md → amber, not red
@@ -63,9 +65,10 @@ function serviceArea(l: ExtractedLead): CriterionResult {
 function timeline(l: ExtractedLead, now: Date): CriterionResult {
   if (l.completionNeededBy) {
     const weeks = weeksBetween(now, new Date(l.completionNeededBy));
-    if (weeks < RULES.minWeeksToCompletion)
+    const t = l.scopeLevel === "full_home" ? RULES.fullWeeks : RULES.roomWeeks;
+    if (weeks < t.min)
       return { status: "fail", reason: `Needs completion in ~${Math.max(0, Math.round(weeks))} weeks` };
-    if (weeks < RULES.comfortableWeeksToCompletion)
+    if (weeks < t.comfortable)
       return { status: "unclear", reason: `Tight: completion needed in ~${Math.round(weeks)} weeks` };
   }
   if (l.siteAvailableFrom) {

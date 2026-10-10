@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { actionFromCode, answerCallback, editButtons, sendMessage, type Action } from "@/lib/telegram";
 import { confirmButtons, outcomeButtons } from "@/lib/handoff";
-import { reassignBooking } from "@/lib/calcom";
-import { designerForBooking, leastLoaded } from "@/lib/designers";
+import { reassignBooking } from "@/lib/booking";
+import { leastLoaded } from "@/lib/designers";
 
 // Designer taps in Telegram → bookings, deals (and so HubSpot) stay current with zero data entry.
 
@@ -69,33 +69,25 @@ export async function POST(req: Request) {
       break;
 
     case "reassign": {
-      await db.update(schema.handoffs).set({ reassignedAt: now }).where(eq(schema.handoffs.id, h.id));
-      let next = null;
-      let bookingUpdate: { designerId?: string } = {};
-      if (h.bookingId) {
-        const [b] = await db.select().from(schema.bookings).where(eq(schema.bookings.id, h.bookingId));
-        if (b?.calcomBookingUid) {
-          try {
-            const moved = await reassignBooking(b.calcomBookingUid); // Cal.com picks the next available host
-            next = await designerForBooking(moved.hosts[0] ?? null, "residential");
-          } catch (err) {
-            console.error("cal.com reassign failed", err);
-          }
-        }
-      }
-      next ??= await leastLoaded("residential", h.designerId);
+      const [q] = await db.select({ extracted: schema.qualifications.extracted }).from(schema.qualifications).where(eq(schema.qualifications.id, h.qualificationId));
+      const segment = (q?.extracted as { segment?: string } | undefined)?.segment ?? "residential";
+      // Move the calendar event to someone free at the same time; otherwise hand over without a slot
+      let next = h.bookingId ? await reassignBooking(h.bookingId, segment).catch((err) => (console.error("reassign failed", err), null)) : null;
+      next ??= await leastLoaded(segment, { exclude: h.designerId });
       if (!next || next.id === h.designerId) {
         await answerCallback(cb.id, "No other designer is available — the front desk will help.");
         break;
       }
-      bookingUpdate = { designerId: next.id };
-      if (h.bookingId) await db.update(schema.bookings).set({ ...bookingUpdate, status: "reassigned", updatedAt: now }).where(eq(schema.bookings.id, h.bookingId));
+      await db.update(schema.handoffs).set({ reassignedAt: now }).where(eq(schema.handoffs.id, h.id));
+      const [b] = h.bookingId ? await db.select().from(schema.bookings).where(eq(schema.bookings.id, h.bookingId)) : [];
+      const kept = b?.designerId === next.id; // the event moved with the lead
       const [nh] = await db
         .insert(schema.handoffs)
         .values({ qualificationId: h.qualificationId, bookingId: h.bookingId, designerId: next.id, confirmBy: new Date(now.getTime() + 2 * 3600_000), messageHtml: h.messageHtml })
         .returning();
       if (next.telegramChatId && h.messageHtml) {
-        const m = await sendMessage(next.telegramChatId, `↪️ <i>Reassigned to you by ${designer.name}</i>\n\n${h.messageHtml}`, confirmButtons(nh.id));
+        const note = kept ? "" : "\n<i>Nobody else was free at the booked time — please call the client to fix a new slot.</i>";
+        const m = await sendMessage(next.telegramChatId, `↪️ <i>Reassigned to you by ${designer.name}</i>${note}\n\n${h.messageHtml}`, confirmButtons(nh.id));
         await db.update(schema.handoffs).set({ telegramMessageId: String(m.message_id) }).where(eq(schema.handoffs.id, nh.id));
       }
       await editButtons(chat, msgId, []);

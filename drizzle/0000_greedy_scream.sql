@@ -12,14 +12,14 @@ CREATE TABLE "bookings" (
 	"call_id" uuid,
 	"caller_id" uuid NOT NULL,
 	"designer_id" uuid,
-	"calcom_booking_uid" text,
+	"calendar_event_id" text,
 	"starts_at" timestamp with time zone NOT NULL,
 	"mode" "booking_mode" DEFAULT 'studio' NOT NULL,
 	"status" "booking_status" DEFAULT 'booked' NOT NULL,
 	"auto_booked" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "bookings_calcomBookingUid_unique" UNIQUE("calcom_booking_uid")
+	CONSTRAINT "bookings_calendarEventId_unique" UNIQUE("calendar_event_id")
 );
 --> statement-breakpoint
 CREATE TABLE "callers" (
@@ -81,7 +81,7 @@ CREATE TABLE "designers" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"telegram_chat_id" text,
-	"calcom_user_id" text,
+	"calendar_id" text,
 	"specialties" text[] DEFAULT '{}' NOT NULL,
 	"active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL

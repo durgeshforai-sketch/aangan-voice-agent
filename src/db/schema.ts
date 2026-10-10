@@ -57,7 +57,8 @@ export const designers = pgTable("designers", {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
   telegramChatId: text(),
-  calcomUserId: text(),
+  // Google Calendar id (usually their Gmail address), shared with our service account
+  calendarId: text(),
   // e.g. ["residential", "commercial"]; used to route commercial leads
   specialties: text().array().notNull().default([]),
   active: boolean().notNull().default(true),
@@ -122,7 +123,7 @@ export const bookings = pgTable("bookings", {
     .notNull()
     .references(() => callers.id),
   designerId: uuid().references(() => designers.id),
-  calcomBookingUid: text().unique(),
+  calendarEventId: text().unique(), // Google Calendar event on the designer's calendar
   startsAt: timestamp({ withTimezone: true }).notNull(),
   mode: bookingMode().notNull().default("studio"),
   status: bookingStatus().notNull().default("booked"),

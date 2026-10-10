@@ -7,8 +7,8 @@ import { estimatedValueInr } from "./estimate";
 import { geminiCostInr, vaaniCostInr } from "./costs";
 import { callbackDueAt, isStudioHours } from "./hours";
 import { raiseTask } from "./alerts";
-import { createBooking, filterByPreference, getSlots } from "./calcom";
-import { designerForBooking, leastLoaded } from "./designers";
+import { bookSlot, offerSlots } from "./booking";
+import { leastLoaded } from "./designers";
 import { handoffMessage, confirmButtons } from "./handoff";
 import { sendMessage } from "./telegram";
 
@@ -192,18 +192,23 @@ async function bookAndHandOff(a: {
     : null;
 
   // No live booking (Vaani flow without tools, or the tool failed): book the first slot that fits
-  // what the caller said, at least 24h out. The designer confirms the time with the client.
-  if (!booking && process.env.CALCOM_API_KEY) {
+  // what the caller said. The designer confirms the time with the client.
+  if (!booking && process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     try {
-      const from = new Date(Date.now() + 24 * 3600_000);
-      const slots = filterByPreference(await getSlots(from, new Date(from.getTime() + 10 * 24 * 3600_000)), a.x.lead.availabilityNotes);
+      const { slots } = await offerSlots(a.x.lead.availabilityNotes, 1);
       if (slots[0]) {
-        const b = await createBooking({ start: slots[0].start, name: a.x.lead.name ?? "Aangan enquiry", phone: a.caller.phone, mode, notes: a.x.summary, metadata: { callId: a.callId } });
-        designer = await designerForBooking(b.hosts[0] ?? null, a.x.lead.segment);
-        [booking] = await db
-          .insert(schema.bookings)
-          .values({ callId: a.callId, callerId: a.caller.id, designerId: designer?.id, calcomBookingUid: b.uid, startsAt: new Date(b.start), mode, autoBooked: true })
-          .returning();
+        const r = await bookSlot({
+          start: slots[0].start,
+          name: a.x.lead.name ?? "Aangan enquiry",
+          phone: a.caller.phone,
+          mode,
+          segment: a.x.lead.segment,
+          notes: a.x.summary,
+          callerId: a.caller.id,
+          callId: a.callId,
+          autoBooked: true,
+        });
+        if (r) [booking, designer] = [r.booking, r.designer];
       }
     } catch (err) {
       console.error("post-call booking failed", err);

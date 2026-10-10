@@ -13,8 +13,7 @@ Open `.env.local` and fill in the blank entries. `VAANI_TOOL_SECRET`, `TELEGRAM_
 | `VAANI_WEBHOOK_SECRET` | Step 5. It's shown once, when you register the webhook |
 | `VAANI_INR_PER_MINUTE` | Your per-minute rate on the Vaani billing page |
 | `GEMINI_API_KEY` | Google AI Studio |
-| `CALCOM_API_KEY` | Cal.com → Settings → Developer → API keys |
-| `CALCOM_EVENT_TYPE_ID` | Step 4 |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Step 4 |
 | `TELEGRAM_BOT_TOKEN` | @BotFather |
 | `TELEGRAM_ESCALATION_CHAT_ID` | Step 6 |
 | `DASHBOARD_PASSWORD` | Choose one for Nikhil and the front desk |
@@ -35,11 +34,16 @@ npm run simulate               # full pipeline on the Neon test branch → dashb
 ```
 Fix the prompt until `eval:conversations` passes. **Zero price quotes is non-negotiable.**
 
-## 4. Cal.com (you)
-1. Create a **Team** with the designers (2–3 test users are fine to start).
-2. Create a team event type called **"Free design consultation"**: 60 min, **Round Robin**, IST working hours. Optionally add a location option for "Site visit (attendee address)".
-3. Copy its numeric id (it's in the event type's URL) into `CALCOM_EVENT_TYPE_ID`.
-4. Under the event's **Advanced** settings, turn off attendee emails/reminders, because callers get a placeholder email address. Designers still get their calendar invites.
+## 4. Google Calendar (you, ~10 minutes, free)
+We use Google Calendar instead of Cal.com, because Cal.com's round-robin needs a paid Teams plan. Our backend does the round-robin itself (least-loaded, commercial specialists first).
+1. Go to https://console.cloud.google.com → create a project, e.g. **aangan-voice-agent**.
+2. **APIs & Services → Library** → enable **Google Calendar API**.
+3. **IAM & Admin → Service Accounts → Create**, named e.g. `aangan-booking`. It needs no roles.
+4. Open it → **Keys → Add key → JSON**. A file downloads. Paste its entire contents as one line into `GOOGLE_SERVICE_ACCOUNT_JSON`, or base64 it with `base64 -i key.json`. Then delete the downloaded file.
+5. Each designer (start with 2–3 test calendars): Google Calendar → ⚙ **Settings → their calendar → Share with specific people** → add the service account's `client_email` (`…@…iam.gserviceaccount.com`) with **"Make changes to events"**. Their calendar id is usually their Gmail address; it goes in `scripts/designers.json` as `calendarId`.
+6. Consultation hours default to Mon–Sat 10:00–19:00 IST in 60-minute slots. Change them with `CONSULT_*` if needed.
+
+Designers see bookings as normal events on their own calendar, with the client's details and a link to the call. No invite is emailed to the caller.
 
 ## 5. Vaani (you, with Claude reading along)
 1. **Phone number:** connect the Twilio number in the Vaani dashboard (Quick start → "Configure your Twilio number").
@@ -59,7 +63,7 @@ Every tool response includes `say`, a line the agent can speak as-is. Arguments 
 ## 6. Telegram (you + Claude)
 1. Each designer opens the bot and sends `/start`. The bot replies with their chat id.
 2. Create a group for the front desk and Nikhil, add the bot, and send `/start` in the group. That chat id goes in `TELEGRAM_ESCALATION_CHAT_ID`.
-3. Copy `scripts/designers.example.json` to `scripts/designers.json`, fill in names, chat ids, Cal.com user ids and specialties, then run `npm run designers`. That file stays out of git.
+3. Copy `scripts/designers.example.json` to `scripts/designers.json`, fill in names, Telegram chat ids, Google calendar ids and specialties, then run `npm run designers`. That file stays out of git.
 4. After deploying: `npm run setup:telegram`.
 
 ## 7. Deploy (Claude, once you've logged in to Vercel once with `vercel login`)
