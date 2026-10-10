@@ -11,10 +11,13 @@ const MODE_LABEL: Record<Mode, string> = { site_visit: "site visit", studio: "st
 
 const withCalendars = async () => (await activeDesigners()).filter((d) => d.calendarId);
 
-export async function offerSlots(preference: string | null | undefined, limit = 4) {
+export async function offerSlots(preference: string | null | undefined, limit = 4, fromDate?: string | null) {
   const team = await withCalendars();
   if (!team.length) return { slots: [], matchedPreference: false };
-  const all = await findSlots(team.map((d) => d.calendarId!));
+  // Callers often want a date weeks out (e.g. after possession). Start the 10-day window there.
+  const parsed = fromDate ? new Date(`${fromDate.slice(0, 10)}T00:00:00+05:30`) : null;
+  const from = parsed && !isNaN(parsed.getTime()) && parsed > new Date() ? parsed : new Date();
+  const all = await findSlots(team.map((d) => d.calendarId!), from);
   const fitting = filterByPreference(all, preference);
   const chosen = (fitting.length ? fitting : all).slice(0, limit);
   return { slots: chosen.map((s) => ({ start: s.start, end: s.end, label: formatIst(new Date(s.start)) })), matchedPreference: fitting.length > 0 };

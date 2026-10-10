@@ -70,7 +70,7 @@ async function lookupCaller(a: Args) {
 }
 
 async function checkAvailability(a: Args) {
-  const { slots, matchedPreference } = await offerSlots(s(a.preference));
+  const { slots, matchedPreference } = await offerSlots(s(a.preference), 4, s(a.from_date));
   if (!slots.length) return { ok: false, slots: [], say: "No slots are open in the next ten days. Offer to have the studio call back with a time." };
   return {
     ok: true,

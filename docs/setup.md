@@ -54,7 +54,7 @@ Designers see bookings as normal events on their own calendar, with the client's
 | Tool | URL | Arguments |
 |---|---|---|
 | `lookup_caller` | `/api/vaani/tools/lookup-caller` | `phone` |
-| `check_availability` | `/api/vaani/tools/check-availability` | `mode` (site_visit/studio), `preference` (free text, e.g. "weekends") |
+| `check_availability` | `/api/vaani/tools/check-availability` | `mode` (site_visit/studio), `preference` (free text, e.g. "weekends"), `from_date` (YYYY-MM-DD, when the caller wants a later date) |
 | `book_consultation` | `/api/vaani/tools/book-consultation` | `start` (ISO, from check_availability), `mode`, `name`, `phone`, `address`, `segment` |
 | `escalate` | `/api/vaani/tools/escalate` | `reason`, `name`, `phone` |
 

@@ -25,6 +25,7 @@ const SYSTEM = `You extract structured facts from enquiry call transcripts for A
 Rules:
 - Only record what the caller actually said. If something wasn't said, use null / "unknown" / "unclear". Never guess.
 - Dates: resolve relative dates ("by March", "in six weeks") against the call date given. Month-only → last day of that month. For occasions ("before Diwali", "before guests arrive"), use what the conversation says about how far away it is.
+- "As soon as possible", "immediately", "urgently" with no stated deadline = preferredStart (today), NOT completionNeededBy. Only set completionNeededBy when they name a date or event it must be finished by.
 - siteAvailableFrom vs preferredStart: "possession in 6 weeks" / "we'll move out in February" = siteAvailableFrom. "January start would be ideal" / "execution from December" = preferredStart. A home they already live in or own empty is available now (null).
 - callType "returning_enquiry": they contacted Aangan before about this NEW project and are following up (often annoyed nobody replied). That is a lead, not a complaint.
 - city: "pune" for Pune city localities, "pcmc" for Pimpri-Chinchwad localities (Pimpri, Chinchwad, Pimple Saudagar, Pimple Nilakh, Ravet, Hinjewadi, Wakad is Pune), "other" for anywhere else (Talegaon, Lonavala, Nashik, Mumbai...), "unknown" if not said.

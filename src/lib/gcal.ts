@@ -87,9 +87,9 @@ const istParts = (d: Date) => {
 };
 
 /** Candidate slot starts inside consultation hours. Pure — tested. */
-export function candidateSlots(from: Date, days: number, c = CONSULT): Interval[] {
+export function candidateSlots(from: Date, days: number, c = CONSULT, now = new Date()): Interval[] {
   const out: Interval[] = [];
-  const earliest = new Date(from.getTime() + c.leadHours * 3600_000);
+  const earliest = new Date(Math.max(from.getTime(), now.getTime() + c.leadHours * 3600_000));
   for (let i = 0; i <= days; i++) {
     const day = new Date(from.getTime() + i * 24 * 3600_000);
     const { weekday, ymd } = istParts(day);

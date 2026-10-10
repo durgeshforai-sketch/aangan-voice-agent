@@ -7,7 +7,7 @@ const ist = (s: string) => new Date(`${s}+05:30`);
 describe("consultation slots", () => {
   // Fri 9 Oct 2026, 3pm IST
   const from = ist("2026-10-09T15:00:00");
-  const cands = candidateSlots(from, 3, C);
+  const cands = candidateSlots(from, 3, C, from);
 
   it("starts no earlier than the lead time and skips Sundays", () => {
     expect(cands[0].start.toISOString()).toBe(ist("2026-10-10T11:00:00").toISOString()); // Sat 11am (20h after Fri 3pm)

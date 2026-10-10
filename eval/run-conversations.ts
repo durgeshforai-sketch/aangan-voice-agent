@@ -34,7 +34,7 @@ const TOOLS = [
   {
     functionDeclarations: [
       { name: "lookup_caller", description: "Look up the caller's number at call start", parametersJsonSchema: { type: "object", properties: { phone: { type: "string" } } } },
-      { name: "check_availability", description: "Find consultation slots", parametersJsonSchema: { type: "object", properties: { mode: { type: "string", enum: ["site_visit", "studio"] }, preference: { type: "string" } } } },
+      { name: "check_availability", description: "Find consultation slots", parametersJsonSchema: { type: "object", properties: { mode: { type: "string", enum: ["site_visit", "studio"] }, preference: { type: "string" }, from_date: { type: "string", description: "YYYY-MM-DD, earliest date the caller wants" } } } },
       {
         name: "book_consultation",
         description: "Book a consultation slot",
@@ -50,7 +50,7 @@ const TOOLS = [
 ];
 
 function fakeTool(c: SeedCase, name: string, args: Record<string, unknown>) {
-  const day = new Date(c.receivedAt);
+  const day = name === "check_availability" && typeof args.from_date === "string" ? new Date(`${args.from_date}T00:00:00+05:30`) : new Date(c.receivedAt);
   const slot = (d: number, h: number) => new Date(day.getTime() + d * 864e5).toISOString().slice(0, 10) + `T${String(h).padStart(2, "0")}:00:00+05:30`;
   switch (name) {
     case "lookup_caller":
@@ -120,6 +120,7 @@ async function converse(c: SeedCase) {
 
 // Agent-side guardrail checks on the transcript
 const agentLines = (t: string) => t.split("\n").filter((l) => l.startsWith("Agent:")).join("\n");
+const PROMISE = /(i('| wi)ll|we('| wi)ll|let me) (send|share|whatsapp|email|forward)/i;
 const PRICE = /(₹|rs\.?\s?\d|rupees|\d[\d,.]*\s*(lakh|lac|lakhs|k\b|thousand|crore)|per\s*(sq|square)\s*(ft|feet|foot))/i;
 const ASKED_TIMELINE = /(when would you|need it (complete|done|finished)|timeline|by when|kab tak)/i;
 const ASKED_DECIDER = /(anyone else|who else|involved in (the )?decid|decision|decide)/i;
@@ -143,9 +144,11 @@ async function runCase(c: SeedCase): Promise<string[]> {
     if (!ok.includes(q.route)) problems.push(`route ${q.route}, want ${ok.join("|")}`);
     if (extraction.agentQuotedPrice) problems.push("extraction says agent QUOTED A PRICE");
     if (priceHit && c.expect.route !== "close") problems.push(`agent said "${priceHit}" — check for a price`);
+    const promise = agent.match(PROMISE)?.[0];
+    if (promise) problems.push(`agent promised "${promise}…" — nothing sends that`);
     const isLead = !["escalate", "log"].includes(c.expect.route);
     const bookableNow = q.route === "book" || q.route === "book_with_note";
-    if (isLead && c.expect.route !== "close" && !ASKED_TIMELINE.test(agent) && !extraction.lead.completionNeededBy && !extraction.lead.timelineFlexible) problems.push("never asked about timeline");
+    if (isLead && c.expect.route !== "close" && !ASKED_TIMELINE.test(agent) && !extraction.lead.completionNeededBy && !extraction.lead.timelineFlexible && !extraction.lead.siteAvailableFrom && !extraction.lead.preferredStart && extraction.lead.scopeLevel !== "unknown") problems.push("never asked about timeline");
     if (isLead && bookableNow && !ASKED_DECIDER.test(agent) && extraction.lead.decisionMaker === "unknown") problems.push("never asked who decides");
     if (bookableNow && !conv.booked) problems.push("qualified but not booked on the call");
     if (c.expect.route === "close" && conv.booked) problems.push("booked a lead that should be declined");
